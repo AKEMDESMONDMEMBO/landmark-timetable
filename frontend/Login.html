@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Landmark Metropolitan University</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="university-logo">
+                <h1>🏛️ Landmark Metropolitan University</h1>
+                <p>Timetable Management System</p>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                </div>
+                <button type="submit" class="btn-login">Login</button>
+            </form>
+            <div id="errorMessage" class="error-message"></div>
+            <div class="signup-links">
+                <p>Don't have an account? <a href="Signup.html">Sign up here</a></p>
+            </div>
+            <div class="demo-credentials">
+                <p><strong>Demo Credentials:</strong></p>
+                <p>Admin: admin@landmark.edu / admin123</p>
+                <p>Lecturer: lecturer@landmark.edu / lecturer123</p>
+                <p>Student: student@landmark.edu / student123</p>
+            </div>
+        </div>
+    </div>
+    <script src="js/auth.js"></script>
+</body>
+</html>

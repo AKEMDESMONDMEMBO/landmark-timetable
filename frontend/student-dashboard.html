@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - Landmark Metropolitan University</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>Student Portal</h2>
+            </div>
+            <ul class="sidebar-menu">
+                <li class="active" data-tab="dashboard">My Timetable</li>
+                <li data-tab="courses">My Courses</li>
+                <li data-tab="profile">Profile</li>
+                <li data-tab="logout">Logout</li>
+            </ul>
+        </nav>
+        <main class="main-content">
+            <div class="top-bar">
+                <h1 id="pageTitle">My Timetable</h1>
+                <div class="user-info">
+                    <span id="userName"></span>
+                </div>
+            </div>
+            <div id="contentArea"></div>
+        </main>
+    </div>
+    <script src="js/auth.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
