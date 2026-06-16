@@ -4,33 +4,110 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard - Landmark Metropolitan University</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Styles -->
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/design-system.css">
+    <link rel="stylesheet" href="css/dashboard-new.css">
 </head>
-<body>
-    <div class="dashboard-container">
-        <nav class="sidebar">
+<body class="bg-slate-50">
+    <div class="dashboard-wrapper">
+        <!-- Modern Sidebar -->
+        <aside class="new-sidebar">
             <div class="sidebar-header">
-                <h2>Student Portal</h2>
-            </div>
-            <ul class="sidebar-menu">
-                <li class="active" data-tab="dashboard">My Timetable</li>
-                <li data-tab="courses">My Courses</li>
-                <li data-tab="profile">Profile</li>
-                <li data-tab="logout">Logout</li>
-            </ul>
-        </nav>
-        <main class="main-content">
-            <div class="top-bar">
-                <h1 id="pageTitle">My Timetable</h1>
-                <div class="user-info">
-                    <span id="userName"></span>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: var(--spacing-3);">
+                    <div style="display:flex; align-items:center; gap: var(--spacing-3);">
+                        <div class="logo-box">
+                            <i class="fas fa-university"></i>
+                        </div>
+                        <div class="logo-text">
+                            <h3>LMU</h3>
+                            <p>STUDENT PORTAL</p>
+                        </div>
+                    </div>
+                    <div id="closeSidebar" style="display: none; cursor: pointer; font-size: 1.25rem; color: var(--text-muted);">
+                        <i class="fas fa-times"></i>
+                    </div>
                 </div>
             </div>
-            <div id="contentArea"></div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-section">MAIN MENU</div>
+                <ul class="sidebar-menu">
+                    <li class="nav-item active" data-tab="dashboard">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>My Timetable</span>
+                    </li>
+                    <li class="nav-item" data-tab="courses">
+                        <i class="fas fa-book-open"></i>
+                        <span>My Courses</span>
+                    </li>
+                    <li class="nav-item" data-tab="profile">
+                        <i class="fas fa-user-graduate"></i>
+                        <span>My Profile</span>
+                    </li>
+                </ul>
+
+                <div class="nav-section">SYSTEM</div>
+                <ul class="sidebar-menu">
+                    <li class="nav-item" data-tab="notifications">
+                        <i class="fas fa-bell"></i>
+                        <span>Notifications</span>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="nav-item" data-tab="logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-wrapper">
+            <!-- Top Navigation -->
+            <header class="top-nav">
+                <div class="top-nav-left">
+                    <div class="icon-btn" id="sidebarToggle" style="display: none;">
+                        <i class="fas fa-bars"></i>
+                    </div>
+                </div>
+                
+                <div class="top-nav-actions">
+                    <div class="action-btn" id="notificationBtn">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge-dot" id="notifBadge" style="display:none;"></span>
+                    </div>
+                    
+                    <div class="user-profile" id="userProfileBtn">
+                        <div class="user-details">
+                            <span class="u-name" id="userName">Student Name</span>
+                            <span class="u-role">Student</span>
+                        </div>
+                        <div class="u-avatar" id="userAvatar">S</div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dynamic Content Area -->
+            <div class="content-body" id="contentArea">
+                <!-- Content loaded by dashboard.js -->
+            </div>
         </main>
     </div>
+
+    <!-- Modals Container -->
+    <div id="modalContainer"></div>
+
     <script src="js/auth.js"></script>
     <script src="js/dashboard.js"></script>
+    <script src="js/timetable.js"></script>
 </body>
 </html>

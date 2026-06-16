@@ -10,6 +10,20 @@ CREATE TABLE users (
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     role VARCHAR(20) CHECK (role IN ('admin', 'lecturer', 'student')) NOT NULL,
+    department_id INTEGER,
+    specialty_id INTEGER,
+    level_id INTEGER,
+    is_verified BOOLEAN DEFAULT FALSE,
+    verification_otp VARCHAR(6),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Schools Table
+CREATE TABLE schools (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(50) UNIQUE,
+    description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -18,6 +32,7 @@ CREATE TABLE departments (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) UNIQUE NOT NULL,
     code VARCHAR(10) UNIQUE NOT NULL,
+    school_id INTEGER REFERENCES schools(id) ON DELETE CASCADE,
     description TEXT
 );
 
@@ -96,6 +111,17 @@ CREATE TABLE timetable (
     UNIQUE(room_id, time_slot_id),
     UNIQUE(lecturer_id, time_slot_id),
     UNIQUE(level_id, time_slot_id)
+);
+
+-- Notifications Table
+CREATE TABLE notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    role_target VARCHAR(20),
+    title VARCHAR(150) NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Insert Sample Data

@@ -1,6 +1,37 @@
 const pool = require('../config/database');
 
 class Lecturer {
+    static async ensureTable() {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS lecturers (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+                employee_id VARCHAR(50) UNIQUE,
+                specialization VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Migration
+        await pool.query(`
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='lecturers' AND column_name='created_at') THEN
+                    ALTER TABLE lecturers ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                END IF;
+            END $$;
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS lecturer_courses (
+                lecturer_id INTEGER REFERENCES lecturers(id) ON DELETE CASCADE,
+                course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                PRIMARY KEY (lecturer_id, course_id)
+            )
+        `);
+    }
+
     static async create(lecturerData) {
         const { user_id, department_id, employee_id, specialization } = lecturerData;
         const result = await pool.query(

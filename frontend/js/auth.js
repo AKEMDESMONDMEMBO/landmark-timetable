@@ -15,7 +15,14 @@ if (document.getElementById('loginForm')) {
                 body: JSON.stringify({ email, password })
             });
             
-            const data = await response.json();
+            let data;
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                throw new Error(text || `Server responded with status ${response.status}`);
+            }
             
             if (data.success) {
                 localStorage.setItem('token', data.token);
@@ -30,10 +37,11 @@ if (document.getElementById('loginForm')) {
                     window.location.href = 'student-dashboard.html';
                 }
             } else {
-                document.getElementById('errorMessage').textContent = data.message;
+                document.getElementById('errorMessage').textContent = data.message || 'Login failed';
             }
         } catch (error) {
-            document.getElementById('errorMessage').textContent = 'Login failed. Please try again.';
+            console.error('Login Error:', error);
+            document.getElementById('errorMessage').textContent = error.message || 'Login failed. Please try again.';
         }
     });
 }
@@ -42,7 +50,7 @@ if (document.getElementById('loginForm')) {
 function checkAuth() {
     const token = localStorage.getItem('token');
     if (!token) {
-        window.location.href = 'login.html';
+        window.location.href = 'Login.html';
         return false;
     }
     return true;
@@ -61,5 +69,5 @@ function getAuthHeaders() {
 function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    window.location.href = 'login.html';
+    window.location.href = 'Login.html';
 }

@@ -1,6 +1,51 @@
 const pool = require('../config/database');
 
 class Course {
+    static async ensureTable() {
+        // First ensure levels table exists as it's a dependency
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS levels (
+                id SERIAL PRIMARY KEY,
+                level_number INTEGER UNIQUE NOT NULL,
+                name VARCHAR(100),
+                description TEXT
+            )
+        `);
+
+        // Migration for levels
+        await pool.query(`
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='levels' AND column_name='name') THEN
+                    ALTER TABLE levels ADD COLUMN name VARCHAR(100);
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='levels' AND column_name='description') THEN
+                    ALTER TABLE levels ADD COLUMN description TEXT;
+                END IF;
+                ALTER TABLE levels DROP CONSTRAINT IF EXISTS levels_level_number_check;
+            END $$;
+        `);
+
+        // Seed levels if empty
+        const levelsCheck = await pool.query('SELECT COUNT(*) FROM levels');
+        if (parseInt(levelsCheck.rows[0].count) === 0) {
+            await pool.query("INSERT INTO levels (level_number, name) VALUES (100, '100 Level'), (200, '200 Level'), (300, '300 Level'), (400, '400 Level'), (500, '500 Level')");
+        }
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS courses (
+                id SERIAL PRIMARY KEY,
+                course_code VARCHAR(20) UNIQUE NOT NULL,
+                course_name VARCHAR(255) NOT NULL,
+                credits INTEGER DEFAULT 3,
+                department_id INTEGER REFERENCES departments(id) ON DELETE CASCADE,
+                level_id INTEGER REFERENCES levels(id) ON DELETE SET NULL,
+                semester INTEGER CHECK (semester IN (1, 2)),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+    }
+
     static async create(courseData) {
         const { course_code, course_name, credits, department_id, level_id, semester } = courseData;
         const result = await pool.query(
@@ -12,7 +57,7 @@ class Course {
 
     static async findAll() {
         const result = await pool.query(
-            `SELECT c.*, d.name as department_name, l.level_number 
+            `SELECT c.*, d.name as department_name, l.level_number, l.name as level_name
              FROM courses c
              LEFT JOIN departments d ON c.department_id = d.id
              LEFT JOIN levels l ON c.level_id = l.id
@@ -23,7 +68,7 @@ class Course {
 
     static async findById(id) {
         const result = await pool.query(
-            `SELECT c.*, d.name as department_name, l.level_number 
+            `SELECT c.*, d.name as department_name, l.level_number, l.name as level_name
              FROM courses c
              LEFT JOIN departments d ON c.department_id = d.id
              LEFT JOIN levels l ON c.level_id = l.id

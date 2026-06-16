@@ -1,9 +1,53 @@
+function formatLevelLabel(level) {
+    if (!level) {
+        return 'Unknown Level';
+    }
+
+    const customName = typeof level.name === 'string' ? level.name.trim() : '';
+    if (customName) {
+        return customName;
+    }
+
+    const levelNumber = level.level_number ?? level.levelNumber;
+    if (levelNumber !== undefined && levelNumber !== null && levelNumber !== '') {
+        return `Level ${levelNumber}`;
+    }
+
+    return 'Unknown Level';
+}
+
+window.formatLevelLabel = formatLevelLabel;
+
+async function refreshCurrentUser() {
+    try {
+        const response = await fetch(`${API_URL}/users/me`, {
+            headers: getAuthHeaders()
+        });
+        const data = await response.json();
+        if (data.success && data.data) {
+            localStorage.setItem('user', JSON.stringify(data.data));
+            return data.data;
+        }
+    } catch (error) {
+        console.error('Error fetching user profile:', error);
+    }
+    return JSON.parse(localStorage.getItem('user'));
+}
+
 // Initialize dashboard
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     if (!checkAuth()) return;
     
-    const user = JSON.parse(localStorage.getItem('user'));
+    let user = await refreshCurrentUser();
+    if (!user) {
+        user = JSON.parse(localStorage.getItem('user'));
+    }
+
     document.getElementById('userName').textContent = user.full_name;
+    const avatar = document.getElementById('userAvatar');
+    if (avatar && user.full_name) {
+        avatar.textContent = user.full_name.charAt(0).toUpperCase();
+    }
     
     // Load default content based on role
     if (user.role === 'admin') {
@@ -15,19 +59,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Setup sidebar navigation
-    document.querySelectorAll('.sidebar-menu li').forEach(item => {
+    document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', () => {
             const tab = item.getAttribute('data-tab');
+            if (!tab) return;
+            
             if (tab === 'logout') {
-                logout();
+                handleLogout();
                 return;
             }
             
-            document.querySelectorAll('.sidebar-menu li').forEach(li => li.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(li => li.classList.remove('active'));
             item.classList.add('active');
             
             if (user.role === 'admin') {
-                handleAdminTab(tab);
+                if (typeof handleAdminTab === 'function') {
+                    handleAdminTab(tab);
+                } else {
+                    console.error('handleAdminTab not found');
+                }
             } else if (user.role === 'lecturer') {
                 handleLecturerTab(tab);
             } else {
@@ -35,481 +85,582 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Setup Notification Click
+    const notifBtn = document.getElementById('notificationBtn');
+    const notifDropdown = document.getElementById('notifDropdown');
+    if (notifBtn && notifDropdown) {
+        notifBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notifDropdown.classList.toggle('active');
+            if (notifDropdown.classList.contains('active')) {
+                loadNotifications();
+            }
+        });
+    }
+
+    document.addEventListener('click', () => {
+        if (notifDropdown) notifDropdown.classList.remove('active');
+    });
+
+    // Setup sidebar toggle for mobile
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebar = document.querySelector('.new-sidebar');
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sidebar.classList.toggle('mobile-active');
+            
+            // Create overlay if it doesn't exist
+            let overlay = document.querySelector('.sidebar-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'sidebar-overlay';
+                overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:95; display:none;';
+                document.body.appendChild(overlay);
+                overlay.addEventListener('click', () => {
+                    sidebar.classList.remove('mobile-active');
+                    overlay.style.display = 'none';
+                });
+            }
+            overlay.style.display = sidebar.classList.contains('mobile-active') ? 'block' : 'none';
+        });
+    }
+
+    const closeSidebar = document.getElementById('closeSidebar');
+    if (closeSidebar && sidebar) {
+        closeSidebar.addEventListener('click', () => {
+            sidebar.classList.remove('mobile-active');
+            const overlay = document.querySelector('.sidebar-overlay');
+            if (overlay) overlay.style.display = 'none';
+        });
+    }
+
+    // Close sidebar when clicking menu items on mobile
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            if (window.innerWidth <= 768 && sidebar) {
+                sidebar.classList.remove('mobile-active');
+                const overlay = document.querySelector('.sidebar-overlay');
+                if (overlay) overlay.style.display = 'none';
+            }
+            // ... existing tab logic is already there in a separate listener ...
+        });
+    });
+
+    // Initial notifications load and polling
+    loadNotifications();
+    setInterval(loadNotifications, 30000); // Poll every 30 seconds
 });
 
-// Admin Dashboard Functions
-async function loadAdminDashboard() {
-    const contentArea = document.getElementById('contentArea');
-    contentArea.innerHTML = `
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>Total Users</h3>
-                <p id="totalUsers">Loading...</p>
-            </div>
-            <div class="stat-card">
-                <h3>Total Courses</h3>
-                <p id="totalCourses">Loading...</p>
-            </div>
-            <div class="stat-card">
-                <h3>Total Lecturers</h3>
-                <p id="totalLecturers">Loading...</p>
-            </div>
-            <div class="stat-card">
-                <h3>Timetable Entries</h3>
-                <p id="totalEntries">Loading...</p>
-            </div>
-        </div>
-        <div class="recent-activities">
-            <h2>Recent Timetable Entries</h2>
-            <div id="recentTimetable"></div>
-        </div>
-    `;
-    
-    await loadDashboardStats();
-    await loadRecentTimetable();
-}
-
-async function loadDashboardStats() {
+async function loadNotifications() {
     try {
-        const response = await fetch(`${API_URL}/dashboard/stats`, {
+        const response = await fetch(`${API_URL}/dashboard/notifications`, {
             headers: getAuthHeaders()
         });
         const data = await response.json();
         if (data.success) {
-            document.getElementById('totalUsers').textContent = data.data.totalUsers;
-            document.getElementById('totalCourses').textContent = data.data.totalCourses;
-            document.getElementById('totalLecturers').textContent = data.data.totalLecturers;
-            document.getElementById('totalEntries').textContent = data.data.totalEntries;
+            updateNotificationUI(data.data);
         }
     } catch (error) {
-        console.error('Error loading stats:', error);
+        console.error('Error loading notifications:', error);
     }
 }
 
-async function loadRecentTimetable() {
-    try {
-        const response = await fetch(`${API_URL}/timetable`, {
-            headers: getAuthHeaders()
-        });
-        const data = await response.json();
-        if (data.success && data.data.length > 0) {
-            const table = document.createElement('table');
-            table.innerHTML = `
-                <thead>
-                    <tr><th>Course</th><th>Lecturer</th><th>Room</th><th>Day</th><th>Time</th></tr>
-                </thead>
-                <tbody>
-                    ${data.data.slice(0, 5).map(entry => `
-                        <tr>
-                            <td>${entry.course_code}</td>
-                            <td>${entry.lecturer_name || 'N/A'}</td>
-                            <td>${entry.room_number}</td>
-                            <td>${entry.day_of_week}</td>
-                            <td>${entry.start_time} - ${entry.end_time}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            `;
-            document.getElementById('recentTimetable').appendChild(table);
-        }
-    } catch (error) {
-        console.error('Error loading recent timetable:', error);
-    }
-}
-
-async function loadUserManagement() {
-    const contentArea = document.getElementById('contentArea');
-    contentArea.innerHTML = `
-        <div style="margin-bottom: 20px;">
-            <button class="btn-primary" onclick="showCreateUserModal()">Create New User</button>
-        </div>
-        <div id="usersList"></div>
-    `;
+function updateNotificationUI(notifications) {
+    const list = document.getElementById('notifList');
+    const badge = document.getElementById('notifBadge');
     
-    await loadUsers();
+    if (!list) return;
+
+    const unreadCount = notifications.filter(n => !n.is_read).length;
+    if (badge) badge.style.display = unreadCount > 0 ? 'block' : 'none';
+    
+    if (notifications.length === 0) {
+        list.innerHTML = '<p style="text-align:center; padding: 20px; color: var(--text-secondary);">No notifications</p>';
+        return;
+    }
+    
+    list.innerHTML = notifications.map(n => `
+        <div class="notif-item ${n.is_read ? '' : 'unread'}" onclick="markAsRead(${n.id})">
+            <h4>${n.title}</h4>
+            <p>${n.message}</p>
+            <small>${new Date(n.created_at).toLocaleString()}</small>
+        </div>
+    `).join('');
 }
 
-async function loadUsers() {
+async function markAsRead(id) {
     try {
-        const response = await fetch(`${API_URL}/users`, {
+        await fetch(`${API_URL}/dashboard/notifications/${id}/read`, {
+            method: 'PUT',
             headers: getAuthHeaders()
         });
+        loadNotifications();
+    } catch (error) {
+        console.error('Error marking notification as read:', error);
+    }
+}
+
+async function markAllAsRead() {
+    try {
+        const response = await fetch(`${API_URL}/dashboard/notifications`, { headers: getAuthHeaders() });
         const data = await response.json();
         if (data.success) {
-            const table = `
-                <table>
-                    <thead>
-                        <tr><th>Name</th><th>Email</th><th>Role</th><th>Created At</th><th>Actions</th></tr>
-                    </thead>
-                    <tbody>
-                        ${data.data.map(user => `
-                            <tr>
-                                <td>${user.full_name}</td>
-                                <td>${user.email}</td>
-                                <td>${user.role}</td>
-                                <td>${new Date(user.created_at).toLocaleDateString()}</td>
-                                <td>
-                                    <button class="btn-primary" onclick="editUser(${user.id})">Edit</button>
-                                    <button class="btn-danger" onclick="deleteUser(${user.id})">Delete</button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-            document.getElementById('usersList').innerHTML = table;
-        }
-    } catch (error) {
-        console.error('Error loading users:', error);
-    }
-}
-
-async function loadCourseManagement() {
-    const contentArea = document.getElementById('contentArea');
-    contentArea.innerHTML = `
-        <div style="margin-bottom: 20px;">
-            <button class="btn-primary" onclick="showCreateCourseModal()">Create New Course</button>
-        </div>
-        <div id="coursesList"></div>
-    `;
-    
-    await loadCourses();
-}
-
-async function loadCourses() {
-    try {
-        const response = await fetch(`${API_URL}/courses`, {
-            headers: getAuthHeaders()
-        });
-        const data = await response.json();
-        if (data.success) {
-            const table = `
-                <table>
-                    <thead>
-                        <tr><th>Course Code</th><th>Course Name</th><th>Credits</th><th>Department</th><th>Level</th><th>Actions</th></tr>
-                    </thead>
-                    <tbody>
-                        ${data.data.map(course => `
-                            <tr>
-                                <td>${course.course_code}</td>
-                                <td>${course.course_name}</td>
-                                <td>${course.credits}</td>
-                                <td>${course.department_name || 'N/A'}</td>
-                                <td>${course.level_number || 'N/A'}</td>
-                                <td>
-                                    <button class="btn-primary" onclick="editCourse(${course.id})">Edit</button>
-                                    <button class="btn-danger" onclick="deleteCourse(${course.id})">Delete</button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-            document.getElementById('coursesList').innerHTML = table;
-        }
-    } catch (error) {
-        console.error('Error loading courses:', error);
-    }
-}
-
-async function loadTimetableManagement() {
-    const contentArea = document.getElementById('contentArea');
-    contentArea.innerHTML = `
-        <div style="margin-bottom: 20px;">
-            <button class="btn-primary" onclick="showCreateTimetableModal()">Add Timetable Entry</button>
-        </div>
-        <div id="timetableList"></div>
-    `;
-    
-    await loadTimetable();
-}
-
-async function loadTimetable() {
-    try {
-        const response = await fetch(`${API_URL}/timetable`, {
-            headers: getAuthHeaders()
-        });
-        const data = await response.json();
-        if (data.success) {
-            const table = `
-                <table>
-                    <thead>
-                        <tr><th>Course</th><th>Lecturer</th><th>Room</th><th>Level</th><th>Day</th><th>Time</th><th>Actions</th></tr>
-                    </thead>
-                    <tbody>
-                        ${data.data.map(entry => `
-                            <tr>
-                                <td>${entry.course_code}</td>
-                                <td>${entry.lecturer_name || 'N/A'}</td>
-                                <td>${entry.room_number}</td>
-                                <td>${entry.level_number}</td>
-                                <td>${entry.day_of_week}</td>
-                                <td>${entry.start_time} - ${entry.end_time}</td>
-                                <td>
-                                    <button class="btn-danger" onclick="deleteTimetableEntry(${entry.id})">Delete</button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-            document.getElementById('timetableList').innerHTML = table;
-        }
-    } catch (error) {
-        console.error('Error loading timetable:', error);
-    }
-}
-
-// Modal functions
-function showCreateTimetableModal() {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>Add Timetable Entry</h2>
-            <form id="createTimetableForm">
-                <div class="form-group">
-                    <label>Course:</label>
-                    <select id="course_id" required></select>
-                </div>
-                <div class="form-group">
-                    <label>Lecturer:</label>
-                    <select id="lecturer_id" required></select>
-                </div>
-                <div class="form-group">
-                    <label>Room:</label>
-                    <select id="room_id" required></select>
-                </div>
-                <div class="form-group">
-                    <label>Level:</label>
-                    <select id="level_id" required></select>
-                </div>
-                <div class="form-group">
-                    <label>Time Slot:</label>
-                    <select id="time_slot_id" required></select>
-                </div>
-                <button type="submit" class="btn-primary">Create Entry</button>
-            </form>
-            <div id="conflictMessage" class="conflict-message" style="display:none;"></div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    modal.style.display = 'block';
-    
-    // Load dropdown data
-    loadCoursesForDropdown();
-    loadLecturersForDropdown();
-    loadRoomsForDropdown();
-    loadLevelsForDropdown();
-    loadTimeSlotsForDropdown();
-    
-    const closeBtn = modal.querySelector('.close');
-    closeBtn.onclick = () => modal.remove();
-    
-    const form = document.getElementById('createTimetableForm');
-    form.onsubmit = async (e) => {
-        e.preventDefault();
-        
-        const entryData = {
-            course_id: parseInt(document.getElementById('course_id').value),
-            lecturer_id: parseInt(document.getElementById('lecturer_id').value),
-            room_id: parseInt(document.getElementById('room_id').value),
-            level_id: parseInt(document.getElementById('level_id').value),
-            time_slot_id: parseInt(document.getElementById('time_slot_id').value),
-            academic_year: '2024',
-            semester: 1
-        };
-        
-        try {
-            const response = await fetch(`${API_URL}/timetable`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify(entryData)
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                alert('Timetable entry created successfully!');
-                modal.remove();
-                loadTimetable();
-            } else {
-                const conflictMsg = document.getElementById('conflictMessage');
-                conflictMsg.style.display = 'block';
-                conflictMsg.innerHTML = `<strong>Conflicts Detected:</strong><br>${data.conflicts.join('<br>')}`;
+            const unread = data.data.filter(n => !n.is_read);
+            for (const n of unread) {
+                await fetch(`${API_URL}/dashboard/notifications/${n.id}/read`, {
+                    method: 'PUT',
+                    headers: getAuthHeaders()
+                });
             }
-        } catch (error) {
-            alert('Error creating timetable entry');
+            loadNotifications();
+            if (document.getElementById('fullNotifList')) loadNotificationsView();
         }
-    };
-}
-
-// Helper functions for dropdowns
-async function loadCoursesForDropdown() {
-    const response = await fetch(`${API_URL}/courses`, { headers: getAuthHeaders() });
-    const data = await response.json();
-    if (data.success) {
-        const select = document.getElementById('course_id');
-        select.innerHTML = data.data.map(course => 
-            `<option value="${course.id}">${course.course_code} - ${course.course_name}</option>`
-        ).join('');
+    } catch (error) {
+        console.error('Error marking all notifications as read:', error);
     }
 }
 
-async function loadLecturersForDropdown() {
-    const response = await fetch(`${API_URL}/lecturers`, { headers: getAuthHeaders() });
-    const data = await response.json();
-    if (data.success) {
-        const select = document.getElementById('lecturer_id');
-        select.innerHTML = data.data.map(lecturer => 
-            `<option value="${lecturer.id}">${lecturer.full_name}</option>`
-        ).join('');
-    }
-}
-
-async function loadRoomsForDropdown() {
-    const response = await fetch(`${API_URL}/rooms`, { headers: getAuthHeaders() });
-    const data = await response.json();
-    if (data.success) {
-        const select = document.getElementById('room_id');
-        select.innerHTML = data.data.map(room => 
-            `<option value="${room.id}">${room.room_number} (Capacity: ${room.capacity})</option>`
-        ).join('');
-    }
-}
-
-async function loadLevelsForDropdown() {
-    const response = await fetch(`${API_URL}/dashboard/levels`, { headers: getAuthHeaders() });
-    const data = await response.json();
-    if (data.success) {
-        const select = document.getElementById('level_id');
-        select.innerHTML = data.data.map(level => 
-            `<option value="${level.id}">${level.name}</option>`
-        ).join('');
-    }
-}
-
-async function loadTimeSlotsForDropdown() {
-    const response = await fetch(`${API_URL}/dashboard/timeslots`, { headers: getAuthHeaders() });
-    const data = await response.json();
-    if (data.success) {
-        const select = document.getElementById('time_slot_id');
-        select.innerHTML = data.data.map(slot => 
-            `<option value="${slot.id}">${slot.day_of_week} - ${slot.start_time} to ${slot.end_time}</option>`
-        ).join('');
-    }
-}
-
-// Note: handleAdminTab is defined in admin.js
-
-function setupAdminEventListeners() {
-    window.showCreateUserModal = showCreateUserModal;
-    window.showCreateCourseModal = showCreateCourseModal;
-    window.showCreateTimetableModal = showCreateTimetableModal;
-    window.editUser = editUser;
-    window.deleteUser = deleteUser;
-    window.editCourse = editCourse;
-    window.deleteCourse = deleteCourse;
-    window.deleteTimetableEntry = deleteTimetableEntry;
-}
+// Admin Dashboard Functions - Now handled by admin.js
 
 // Lecturer Dashboard
 async function loadLecturerDashboard() {
-    const user = JSON.parse(localStorage.getItem('user'));
     const contentArea = document.getElementById('contentArea');
+    const user = JSON.parse(localStorage.getItem('user'));
+    
+    // Build lecturer info details
+    const lecturerInfoDetails = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-4);">
+            ${user.department_name ? `
+                <div style="display: flex; align-items: center; gap: var(--spacing-3);">
+                    <i class="fas fa-building" style="font-size: 1.5rem; opacity: 0.7;"></i>
+                    <div>
+                        <span style="display: block; font-size: 0.75rem; opacity: 0.8; font-weight: 600; text-transform: uppercase;">Department</span>
+                        <span style="display: block; font-size: 1rem; font-weight: 600;">${user.department_name}</span>
+                    </div>
+                </div>
+            ` : ''}
+            ${user.specialization ? `
+                <div style="display: flex; align-items: center; gap: var(--spacing-3);">
+                    <i class="fas fa-star" style="font-size: 1.5rem; opacity: 0.7;"></i>
+                    <div>
+                        <span style="display: block; font-size: 0.75rem; opacity: 0.8; font-weight: 600; text-transform: uppercase;">Specialization</span>
+                        <span style="display: block; font-size: 1rem; font-weight: 600;">${user.specialization}</span>
+                    </div>
+                </div>
+            ` : ''}
+            ${user.employee_id ? `
+                <div style="display: flex; align-items: center; gap: var(--spacing-3);">
+                    <i class="fas fa-id-badge" style="font-size: 1.5rem; opacity: 0.7;"></i>
+                    <div>
+                        <span style="display: block; font-size: 0.75rem; opacity: 0.8; font-weight: 600; text-transform: uppercase;">Employee ID</span>
+                        <span style="display: block; font-size: 1rem; font-weight: 600;">${user.employee_id}</span>
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
     contentArea.innerHTML = `
-        <h2>My Timetable</h2>
-        <div id="lecturerTimetable"></div>
+        <!-- User Info Card -->
+        <div class="card" style="margin-bottom: var(--spacing-8); background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%); color: white; border: none;">
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: var(--spacing-6); align-items: flex-start;">
+                <div style="width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold;">
+                    ${user.full_name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                    <h2 style="margin: 0; font-size: 1.75rem; margin-bottom: var(--spacing-2);">${user.full_name}</h2>
+                    <div style="display: flex; gap: var(--spacing-4); margin-bottom: var(--spacing-3);">
+                        <span><i class="fas fa-envelope" style="margin-right: 0.5rem;"></i>${user.email}</span>
+                    </div>
+                    <span style="background: rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 9999px; display: inline-block; font-size: 0.875rem; font-weight: 600;">Lecturer Account</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Academic Info Card -->
+        ${(user.department_name || user.specialization || user.employee_id) ? `
+            <div class="card" style="margin-bottom: var(--spacing-8); background: #f8fafc; border: 1px solid #e2e8f0;">
+                <h3 style="margin: 0 0 var(--spacing-4) 0; font-size: 1rem; font-weight: 700;">Academic Information</h3>
+                ${lecturerInfoDetails}
+            </div>
+        ` : ''}
+
+        <div class="page-header">
+            <div class="breadcrumb"><span>LECTURER</span><span>DASHBOARD</span><span>SCHEDULE</span></div>
+            <h1>My Teaching Schedule</h1>
+        </div>
+        <div class="card">
+            <div id="lecturerTimetable" style="overflow-x: auto;"><div class="spinner"></div></div>
+        </div>
     `;
     
     try {
-        const response = await fetch(`${API_URL}/dashboard/lecturer-timetable`, {
-            headers: getAuthHeaders()
-        });
+        const response = await fetch(`${API_URL}/dashboard/lecturer-timetable`, { headers: getAuthHeaders() });
         const data = await response.json();
+        const container = document.getElementById('lecturerTimetable');
         if (data.success && data.data.length > 0) {
-            const table = `
-                <table>
-                    <thead>
-                        <tr><th>Course</th><th>Room</th><th>Level</th><th>Day</th><th>Time</th></tr>
-                    </thead>
+            container.innerHTML = `
+                <table class="data-table">
+                    <thead><tr><th>Day</th><th>Time</th><th>Course</th><th>Room</th><th>Level</th></tr></thead>
                     <tbody>
                         ${data.data.map(entry => `
                             <tr>
-                                <td>${entry.course_code} - ${entry.course_name}</td>
-                                <td>${entry.room_number}</td>
-                                <td>${entry.level_number}</td>
-                                <td>${entry.day_of_week}</td>
-                                <td>${entry.start_time} - ${entry.end_time}</td>
+                                <td style="font-weight: 600; color: var(--primary);">${entry.day_of_week}</td>
+                                <td><span class="badge" style="background: #f1f5f9; color: #475569;">${entry.start_time} - ${entry.end_time}</span></td>
+                                <td><strong>${entry.course_code}</strong><br><small style="color: var(--text-secondary)">${entry.course_name}</small></td>
+                                <td><i class="fas fa-door-open"></i> ${entry.room_number}</td>
+                                <td><span class="badge">${formatLevelLabel(entry)}</span></td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
             `;
-            document.getElementById('lecturerTimetable').innerHTML = table;
         } else {
-            document.getElementById('lecturerTimetable').innerHTML = '<p>No timetable entries found.</p>';
+            container.innerHTML = '<div style="padding: 48px; text-align: center;"><i class="fas fa-calendar-times" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 16px; display: block;"></i> No teaching assignments found.</div>';
         }
     } catch (error) {
         console.error('Error loading lecturer timetable:', error);
     }
 }
 
-// Student Dashboard
-async function loadStudentDashboard() {
-    const user = JSON.parse(localStorage.getItem('user'));
+async function loadLecturerCourses() {
     const contentArea = document.getElementById('contentArea');
     contentArea.innerHTML = `
-        <h2>My Class Timetable</h2>
-        <div id="studentTimetable"></div>
+        <div class="page-header">
+            <div class="breadcrumb"><span>LECTURER</span><span>ACADEMIC</span><span>COURSES</span></div>
+            <h1>My Assigned Courses</h1>
+        </div>
+        <div id="lecturerCoursesList" class="grid-3" style="margin-top: var(--spacing-6);"><div class="spinner"></div></div>
     `;
-    
     try {
-        // For demo, show all timetable entries
-        const response = await fetch(`${API_URL}/timetable`, {
-            headers: getAuthHeaders()
-        });
+        const response = await fetch(`${API_URL}/dashboard/lecturer-timetable`, { headers: getAuthHeaders() });
         const data = await response.json();
+        const container = document.getElementById('lecturerCoursesList');
         if (data.success && data.data.length > 0) {
-            const table = `
-                <table>
-                    <thead>
-                        <tr><th>Course</th><th>Lecturer</th><th>Room</th><th>Level</th><th>Day</th><th>Time</th></tr>
-                    </thead>
+            const uniqueCourses = [];
+            const seen = new Set();
+            data.data.forEach(entry => {
+                if (!seen.has(entry.course_id)) {
+                    seen.add(entry.course_id);
+                    uniqueCourses.push(entry);
+                }
+            });
+            container.innerHTML = uniqueCourses.map(course => `
+                <div class="card">
+                    <span class="badge" style="margin-bottom: 12px; display: inline-block; background: var(--primary-light); color: var(--primary);">${course.course_code}</span>
+                    <h3 style="margin-bottom: 12px;">${course.course_name}</h3>
+                    <div style="display: flex; gap: 16px; font-size: 0.85rem; color: var(--text-secondary);">
+                        <span><i class="fas fa-users"></i> Target: ${formatLevelLabel(course)}</span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<p>No assigned courses found.</p>';
+        }
+    } catch (error) {
+        console.error('Error loading lecturer courses:', error);
+    }
+}
+
+// Student Dashboard
+async function loadStudentDashboard() {
+    const contentArea = document.getElementById('contentArea');
+    const user = JSON.parse(localStorage.getItem('user'));
+    
+    // Build student info details
+    const studentInfoDetails = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-4);">
+            <div style="display: flex; align-items: center; gap: var(--spacing-3);">
+                <i class="fas fa-building" style="font-size: 1.5rem; opacity: 0.7;"></i>
+                <div>
+                    <span style="display: block; font-size: 0.75rem; opacity: 0.8; font-weight: 600; text-transform: uppercase;">Department</span>
+                    <span style="display: block; font-size: 1rem; font-weight: 600;">${user.department_name || 'N/A'}</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: var(--spacing-3);">
+                <i class="fas fa-graduation-cap" style="font-size: 1.5rem; opacity: 0.7;"></i>
+                <div>
+                    <span style="display: block; font-size: 0.75rem; opacity: 0.8; font-weight: 600; text-transform: uppercase;">Specialty</span>
+                    <span style="display: block; font-size: 1rem; font-weight: 600;">${user.specialty_name || 'N/A'}</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: var(--spacing-3);">
+                <i class="fas fa-layer-group" style="font-size: 1.5rem; opacity: 0.7;"></i>
+                <div>
+                    <span style="display: block; font-size: 0.75rem; opacity: 0.8; font-weight: 600; text-transform: uppercase;">Level</span>
+                    <span style="display: block; font-size: 1rem; font-weight: 600;">${user.level_name || 'N/A'}</span>
+                    <span style="display: block; font-size: 0.75rem; opacity: 0.7; margin-top: 0.25rem;">ID: ${user.level_id || 'N/A'}</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    contentArea.innerHTML = `
+        <!-- User Info Card -->
+        <div class="card" style="margin-bottom: var(--spacing-8); background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%); color: white; border: none;">
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: var(--spacing-6); align-items: flex-start;">
+                <div style="width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold;">
+                    ${user.full_name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                    <h2 style="margin: 0; font-size: 1.75rem; margin-bottom: var(--spacing-2);">${user.full_name}</h2>
+                    <div style="display: flex; gap: var(--spacing-4); margin-bottom: var(--spacing-3);">
+                        <span><i class="fas fa-envelope" style="margin-right: 0.5rem;"></i>${user.email}</span>
+                    </div>
+                    <span style="background: rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 9999px; display: inline-block; font-size: 0.875rem; font-weight: 600;">Student Account</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Academic Info Card -->
+        <div class="card" style="margin-bottom: var(--spacing-8); background: #f8fafc; border: 1px solid #e2e8f0;">
+            <h3 style="margin: 0 0 var(--spacing-4) 0; font-size: 1rem; font-weight: 700;">Academic Information</h3>
+            ${studentInfoDetails}
+        </div>
+
+        <div class="page-header">
+            <div class="breadcrumb"><span>STUDENT</span><span>DASHBOARD</span><span>TIMETABLE</span></div>
+            <div class="flex justify-between items-center">
+                <h1>My Class Timetable</h1>
+                <div class="flex gap-2">
+                    <button class="btn btn-outline btn-sm" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
+                    <button class="btn btn-primary btn-sm"><i class="fas fa-download"></i> Download PDF</button>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div id="studentTimetable" style="overflow-x: auto;"><div class="spinner"></div></div>
+        </div>
+    `;
+    try {
+        const response = await fetch(`${API_URL}/timetable`, { headers: getAuthHeaders() });
+        const data = await response.json();
+        const container = document.getElementById('studentTimetable');
+        if (data.success && data.data.length > 0) {
+            container.innerHTML = `
+                <table class="data-table">
+                    <thead><tr><th>Day</th><th>Time</th><th>Course</th><th>Lecturer</th><th>Room</th><th>Level</th></tr></thead>
                     <tbody>
                         ${data.data.map(entry => `
                             <tr>
-                                <td>${entry.course_code} - ${entry.course_name}</td>
+                                <td style="font-weight: 600; color: var(--primary);">${entry.day_of_week}</td>
+                                <td><span class="badge" style="background: #f1f5f9; color: #475569;">${entry.start_time} - ${entry.end_time}</span></td>
+                                <td><strong>${entry.course_code}</strong><br><small style="color: var(--text-secondary)">${entry.course_name}</small></td>
                                 <td>${entry.lecturer_name || 'N/A'}</td>
-                                <td>${entry.room_number}</td>
-                                <td>${entry.level_number}</td>
-                                <td>${entry.day_of_week}</td>
-                                <td>${entry.start_time} - ${entry.end_time}</td>
+                                <td><i class="fas fa-map-marker-alt"></i> ${entry.room_number}</td>
+                                <td><span class="badge">${formatLevelLabel(entry)}</span></td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
             `;
-            document.getElementById('studentTimetable').innerHTML = table;
         } else {
-            document.getElementById('studentTimetable').innerHTML = '<p>No timetable entries found.</p>';
+            container.innerHTML = '<div style="padding: 40px; text-align: center;">No timetable entries assigned yet.</div>';
         }
     } catch (error) {
         console.error('Error loading student timetable:', error);
     }
 }
 
-// Placeholder functions for complete implementation
-async function loadLecturerManagement() { alert('Lecturer management coming soon'); }
-async function loadRoomManagement() { alert('Room management coming soon'); }
-function showCreateUserModal() { alert('Create user modal coming soon'); }
-function showCreateCourseModal() { alert('Create course modal coming soon'); }
-function editUser(id) { alert(`Edit user ${id} coming soon`); }
-function deleteUser(id) { alert(`Delete user ${id} coming soon`); }
-function editCourse(id) { alert(`Edit course ${id} coming soon`); }
-function deleteCourse(id) { alert(`Delete course ${id} coming soon`); }
-function deleteTimetableEntry(id) { alert(`Delete timetable entry ${id} coming soon`); }
-function handleLecturerTab(tab) { loadLecturerDashboard(); }
-function handleStudentTab(tab) { loadStudentDashboard(); }
+async function loadStudentCourses() {
+    const contentArea = document.getElementById('contentArea');
+    contentArea.innerHTML = `
+        <div class="page-header">
+            <div class="breadcrumb"><span>STUDENT</span><span>ACADEMIC</span><span>COURSES</span></div>
+            <h1>My Registered Courses</h1>
+        </div>
+        <div id="studentCoursesList" class="grid-3" style="margin-top: var(--spacing-6);"><div class="spinner"></div></div>
+    `;
+    try {
+        const response = await fetch(`${API_URL}/courses`, { headers: getAuthHeaders() });
+        const data = await response.json();
+        const container = document.getElementById('studentCoursesList');
+        if (data.success && data.data.length > 0) {
+            container.innerHTML = data.data.map(course => `
+                <div class="card">
+                    <span class="badge" style="margin-bottom: 12px; display: inline-block; background: var(--primary-light); color: var(--primary);">${course.course_code}</span>
+                    <h3 style="margin-bottom: 12px;">${course.course_name}</h3>
+                    <div style="display: flex; gap: 16px; font-size: 0.85rem; color: var(--text-secondary);">
+                        <span><i class="fas fa-layer-group"></i> ${formatLevelLabel(course)}</span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<p>No courses found.</p>';
+        }
+    } catch (error) {
+        console.error('Error loading student courses:', error);
+    }
+}
+
+function handleStudentTab(tab) {
+    if (tab === 'profile') loadProfile();
+    else if (tab === 'courses') loadStudentCourses();
+    else if (tab === 'notifications') loadNotificationsView();
+    else loadStudentDashboard();
+}
+
+function handleLecturerTab(tab) {
+    if (tab === 'profile') loadProfile();
+    else if (tab === 'courses') loadLecturerCourses();
+    else if (tab === 'notifications') loadNotificationsView();
+    else loadLecturerDashboard();
+}
+
+async function loadNotificationsView() {
+    const contentArea = document.getElementById('contentArea');
+    contentArea.innerHTML = `
+        <div class="page-header">
+            <div class="breadcrumb"><span>SYSTEM</span><span>COMMUNICATION</span><span>NOTIFICATIONS</span></div>
+            <div class="flex justify-between items-center">
+                <h1>All Notifications</h1>
+                <button class="btn btn-outline btn-sm" onclick="markAllAsRead()">Mark all as read</button>
+            </div>
+        </div>
+        <div class="card" id="fullNotifList"><div class="spinner"></div></div>
+    `;
+    try {
+        const response = await fetch(`${API_URL}/dashboard/notifications`, { headers: getAuthHeaders() });
+        const data = await response.json();
+        const container = document.getElementById('fullNotifList');
+        if (data.success && data.data.length > 0) {
+            container.innerHTML = `
+                <div class="notification-full-list">
+                    ${data.data.map(n => `
+                        <div class="notif-full-item ${n.is_read ? '' : 'unread'}" style="padding: 20px; border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="markAsRead(${n.id})">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h4 style="margin: 0 0 8px 0; color: ${n.is_read ? 'var(--text-main)' : 'var(--primary)'}">${n.title}</h4>
+                                    <p style="margin: 0; color: var(--text-secondary);">${n.message}</p>
+                                </div>
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">${new Date(n.created_at).toLocaleString()}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            container.innerHTML = '<div style="padding: 40px; text-align: center;">No notifications found.</div>';
+        }
+    } catch (error) {
+        console.error('Error loading notifications view:', error);
+    }
+}
+
+async function loadProfile() {
+    const contentArea = document.getElementById('contentArea');
+    const user = JSON.parse(localStorage.getItem('user'));
+    contentArea.innerHTML = `
+        <div class="page-header">
+            <div class="breadcrumb"><span>USER</span><span>PROFILE</span></div>
+            <h1>My Profile Settings</h1>
+        </div>
+        <div class="card" style="max-width: 600px;">
+            <form id="profileForm" onsubmit="handleProfileUpdate(event)">
+                <div class="profile-image-section" style="margin-bottom: 32px; text-align: center;">
+                    <div id="imagePreview" style="width: 120px; height: 120px; border-radius: 50%; background: #f1f5f9; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid var(--primary-light);">
+                        ${user.profile_image ? `<img src="${user.profile_image}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user" style="font-size: 3rem; color: #94a3b8;"></i>`}
+                    </div>
+                    <label class="btn btn-outline btn-sm" style="cursor: pointer;">
+                        <i class="fas fa-camera"></i> Change Photo
+                        <input type="file" id="profileImageInput" accept="image/*" style="display: none;" onchange="previewProfileImage(this)">
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="profileName" value="${user.full_name}" required class="input-field">
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="profileEmail" value="${user.email}" required class="input-field">
+                </div>
+                <div class="form-group">
+                    <label>New Password (Optional)</label>
+                    <input type="password" id="profilePassword" placeholder="Enter new password to change" class="input-field">
+                </div>
+                <div style="margin-top: 24px;"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                <div id="profileMessage" style="margin-top: 16px;"></div>
+            </form>
+        </div>
+    `;
+}
+
+function previewProfileImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById('imagePreview').innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+async function handleProfileUpdate(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    const msg = document.getElementById('profileMessage');
+    const full_name = document.getElementById('profileName').value;
+    const email = document.getElementById('profileEmail').value;
+    const password = document.getElementById('profilePassword').value;
+    const imageInput = document.getElementById('profileImageInput');
+    let profile_image = JSON.parse(localStorage.getItem('user')).profile_image;
+    if (imageInput.files && imageInput.files[0]) {
+        profile_image = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsDataURL(imageInput.files[0]);
+        });
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    try {
+        const response = await fetch(`${API_URL}/users/me`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ full_name, email, password, profile_image })
+        });
+        const data = await response.json();
+        if (data.success) {
+            msg.innerHTML = '<div class="success-message" style="display:block;">Profile updated successfully!</div>';
+            const user = JSON.parse(localStorage.getItem('user'));
+            user.full_name = full_name;
+            user.email = email;
+            user.profile_image = profile_image;
+            localStorage.setItem('user', JSON.stringify(user));
+            updateUserProfileUI();
+        } else {
+            msg.innerHTML = `<div class="error-message" style="display:block;">${data.message}</div>`;
+        }
+    } catch (error) {
+        msg.innerHTML = '<div class="error-message" style="display:block;">Failed to update profile.</div>';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+    }
+}
+
+function updateUserProfileUI() {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user) return;
+    const nameEls = [document.getElementById('userName')];
+    const avatarEls = [document.getElementById('userAvatar')];
+    nameEls.forEach(el => { if (el) el.textContent = user.full_name; });
+    avatarEls.forEach(el => {
+        if (el) {
+            if (user.profile_image) el.innerHTML = `<img src="${user.profile_image}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+            else el.textContent = user.full_name.charAt(0).toUpperCase();
+        }
+    });
+}
+
+function handleLogout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = 'Login.html';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(updateUserProfileUI, 500);
+});

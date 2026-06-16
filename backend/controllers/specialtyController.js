@@ -32,14 +32,14 @@ exports.getSpecialtiesByDepartment = async (req, res) => {
 
 exports.createSpecialty = async (req, res) => {
     try {
-        const { name, code, department_id } = req.body;
+        const { name, code, department_id, school_id } = req.body;
 
         // Validation
-        if (!name || !code || !department_id) {
-            return res.status(400).json({ success: false, message: 'Name, code, and department_id are required' });
+        if (!name || !code || !department_id || !school_id) {
+            return res.status(400).json({ success: false, message: 'Name, code, department_id, and school_id are required' });
         }
 
-        const specialty = await Specialty.create({ name, code, department_id });
+        const specialty = await Specialty.create({ name, code, department_id, school_id });
         res.status(201).json({ success: true, data: specialty });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -48,13 +48,13 @@ exports.createSpecialty = async (req, res) => {
 
 exports.updateSpecialty = async (req, res) => {
     try {
-        const { name, code, department_id } = req.body;
+        const { name, code, department_id, school_id } = req.body;
 
-        if (!name || !code || !department_id) {
-            return res.status(400).json({ success: false, message: 'Name, code, and department_id are required' });
+        if (!name || !code || !department_id || !school_id) {
+            return res.status(400).json({ success: false, message: 'Name, code, department_id, and school_id are required' });
         }
 
-        const specialty = await Specialty.update(req.params.id, { name, code, department_id });
+        const specialty = await Specialty.update(req.params.id, { name, code, department_id, school_id });
         if (!specialty) {
             return res.status(404).json({ success: false, message: 'Specialty not found' });
         }

@@ -23,14 +23,20 @@ exports.getDepartmentById = async (req, res) => {
 
 exports.createDepartment = async (req, res) => {
     try {
-        const { name, code, description } = req.body;
+        const { name, code, description, school_id } = req.body;
 
         // Validation
-        if (!name || !code) {
-            return res.status(400).json({ success: false, message: 'Name and code are required' });
+        if (!name || !code || !school_id) {
+            return res.status(400).json({ success: false, message: 'Name, code, and school are required' });
         }
 
-        const department = await Department.create({ name, code, description });
+        const School = require('../models/School');
+        const school = await School.findById(school_id);
+        if (!school) {
+            return res.status(400).json({ success: false, message: 'Selected school does not exist' });
+        }
+
+        const department = await Department.create({ name, code, description, school_id });
         res.status(201).json({ success: true, data: department });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -39,13 +45,19 @@ exports.createDepartment = async (req, res) => {
 
 exports.updateDepartment = async (req, res) => {
     try {
-        const { name, code, description } = req.body;
+        const { name, code, description, school_id } = req.body;
 
-        if (!name || !code) {
-            return res.status(400).json({ success: false, message: 'Name and code are required' });
+        if (!name || !code || !school_id) {
+            return res.status(400).json({ success: false, message: 'Name, code, and school are required' });
         }
 
-        const department = await Department.update(req.params.id, { name, code, description });
+        const School = require('../models/School');
+        const school = await School.findById(school_id);
+        if (!school) {
+            return res.status(400).json({ success: false, message: 'Selected school does not exist' });
+        }
+
+        const department = await Department.update(req.params.id, { name, code, description, school_id });
         if (!department) {
             return res.status(404).json({ success: false, message: 'Department not found' });
         }

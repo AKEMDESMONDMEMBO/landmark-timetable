@@ -4,8 +4,10 @@ const userController = require('../controllers/userController');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 
 router.get('/', authenticateToken, authorizeRole('admin'), userController.getAllUsers);
+router.get('/me', authenticateToken, userController.getProfile);
 router.get('/:id', authenticateToken, authorizeRole('admin'), userController.getUserById);
 router.post('/', authenticateToken, authorizeRole('admin'), userController.createUser);
+router.put('/me', authenticateToken, userController.updateProfile);
 router.put('/:id', authenticateToken, authorizeRole('admin'), userController.updateUser);
 router.delete('/:id', authenticateToken, authorizeRole('admin'), userController.deleteUser);
 

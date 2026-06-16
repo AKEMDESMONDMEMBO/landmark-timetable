@@ -1,6 +1,19 @@
 const pool = require('../config/database');
 
 class Room {
+    static async ensureTable() {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS rooms (
+                id SERIAL PRIMARY KEY,
+                room_number VARCHAR(50) UNIQUE NOT NULL,
+                building VARCHAR(100) NOT NULL,
+                capacity INTEGER NOT NULL,
+                type VARCHAR(50) DEFAULT 'Lecture Room',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+    }
+
     static async create(roomData) {
         const { room_number, building, capacity, type } = roomData;
         const result = await pool.query(

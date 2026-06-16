@@ -10,7 +10,8 @@ const validateMinLength = (str, minLength) => {
 };
 
 const validatePositiveNumber = (num) => {
-    return typeof num === 'number' && num > 0;
+    const n = Number(num);
+    return !isNaN(n) && n > 0;
 };
 
 const validateRequiredFields = (obj, fields) => {
@@ -26,7 +27,11 @@ const validateRequiredFields = (obj, fields) => {
 // Department Validation
 exports.validateDepartment = (data) => {
     const errors = [];
-    
+    const requiredFields = validateRequiredFields(data, ['name', 'code', 'school_id']);
+
+    if (requiredFields.length > 0) {
+        errors.push(`Missing required fields: ${requiredFields.join(', ')}`);
+    }
     if (!validateMinLength(data.name, 2)) {
         errors.push('Department name must be at least 2 characters');
     }
@@ -55,7 +60,7 @@ exports.validateCourse = (data) => {
     if (data.credits > 10) {
         errors.push('Credits cannot exceed 10');
     }
-    if (![1, 2].includes(data.semester)) {
+    if (![1, 2].includes(Number(data.semester))) {
         errors.push('Semester must be 1 or 2');
     }
     if (!validateMinLength(data.course_code, 2)) {
@@ -129,6 +134,41 @@ exports.validateSpecialty = (data) => {
     return errors;
 };
 
+// School Validation
+exports.validateSchool = (data) => {
+    const errors = [];
+    const requiredFields = validateRequiredFields(data, ['name', 'code']);
+
+    if (requiredFields.length > 0) {
+        errors.push(`Missing required fields: ${requiredFields.join(', ')}`);
+    }
+    if (!validateMinLength(data.name, 2)) {
+        errors.push('School name must be at least 2 characters');
+    }
+    if (!validateMinLength(data.code, 1)) {
+        errors.push('School code is required');
+    }
+
+    return errors;
+};
+
+// Level Validation
+exports.validateLevel = (data) => {
+    const errors = [];
+    if (!data.level_number && data.level_number !== 0) {
+        errors.push('Level number is required');
+    } else {
+        const parsedLevel = Number(data.level_number);
+        if (!Number.isInteger(parsedLevel) || parsedLevel <= 0) {
+            errors.push('Level number must be a positive integer');
+        }
+    }
+    if (data.description && data.description.length > 500) {
+        errors.push('Description must be 500 characters or less');
+    }
+    return errors;
+};
+
 // User Validation
 exports.validateUser = (data) => {
     const errors = [];
@@ -164,7 +204,7 @@ exports.validateTimetable = (data) => {
         errors.push(`Missing required fields: ${requiredFields.join(', ')}`);
     }
     
-    if (![1, 2].includes(data.semester)) {
+    if (![1, 2].includes(Number(data.semester))) {
         errors.push('Semester must be 1 or 2');
     }
     if (!/^\d{4}$/.test(data.academic_year)) {

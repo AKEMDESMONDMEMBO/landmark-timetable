@@ -4,70 +4,174 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Landmark Metropolitan University - Timetable Management System</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Styles -->
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/design-system.css">
+    <link rel="stylesheet" href="css/landing-new.css">
 </head>
-<body>
-    <div class="landing-container">
-        <nav class="landing-nav">
-            <div class="nav-brand">
-                <h1>🏛️ LMU</h1>
+<body class="landing-body">
+
+    <!-- Hero Section -->
+    <section class="hero-wrapper" id="home">
+        <div class="hero-text-content">
+            <h1 style="margin-top: 0;">Smart University Timetable Management</h1>
+            <p>Adaptive Scheduling for Modern Universities. Streamline complex logistics with AI-powered conflict resolution and real-time synchronization.</p>
+            <div style="display: flex; gap: 16px; justify-content: center;">
+                <a href="Signup.html" class="btn btn-primary" style="padding: 18px 32px; font-size: 1rem;">
+                    Get Started &nbsp; <i class="fas fa-arrow-right"></i>
+                </a>
+                <a href="#preview" class="btn btn-outline" style="padding: 18px 32px; font-size: 1rem; border-color: white; color: white;">
+                    View Timetable
+                </a>
             </div>
-            <div class="nav-links">
-                <a href="#home">Home</a>
-                <a href="#about">About</a>
-                <a href="#features">Features</a>
-                <a href="login.html" class="btn-login-nav">Login</a>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="section-padding" id="features">
+        <div class="section-header">
+            <span style="color: var(--primary); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; font-size: 0.75rem;">Core Intelligence</span>
+            <h2>Engineered to handle thousands of concurrent schedules without a single overlap.</h2>
+            <p class="text-muted">Our platform eliminates the manual stress of academic planning, allowing administrators to focus on education.</p>
+        </div>
+
+        <div class="feature-modern-grid">
+            <div class="feature-modern-card">
+                <div class="f-icon-box" style="background: #eef2ff; color: #6366f1;">
+                    <i class="fas fa-magic"></i>
+                </div>
+                <h3>Automatic Generation</h3>
+                <p>AI-driven generation that respects professor availability, room capacity, and course requirements.</p>
             </div>
-        </nav>
-        
-        <section id="home" class="hero-section">
-            <div class="hero-content">
-                <h1>Welcome to Landmark Metropolitan University</h1>
-                <h2>Timetable Management System</h2>
-                <p>Efficiently manage academic schedules, avoid conflicts, and streamline your university's timetable operations</p>
-                <a href="login.html" class="btn-hero">Get Started</a>
+            <div class="feature-modern-card">
+                <div class="f-icon-box" style="background: #ecfdf5; color: #10b981;">
+                    <i class="fas fa-shield-virus"></i>
+                </div>
+                <h3>Conflict Detection</h3>
+                <p>Proactive monitoring that identifies and resolves scheduling clashes before they happen.</p>
             </div>
-        </section>
-        
-        <section id="features" class="features-section">
-            <h2>System Features</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">🏢</div>
-                    <h3>Department Management</h3>
-                    <p>Create and manage academic departments with specialties</p>
+            <div class="feature-modern-card">
+                <div class="f-icon-box" style="background: #fdf2f8; color: #ec4899;">
+                    <i class="fas fa-calendar-check"></i>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📚</div>
-                    <h3>Course Management</h3>
-                    <p>Add courses with credits, levels, and semester assignments</p>
+                <h3>Smart Scheduling</h3>
+                <p>Dynamic allocation that optimizes for campus travel time and energy-efficient building usage.</p>
+            </div>
+            <div class="feature-modern-card">
+                <div class="f-icon-box" style="background: #fff7ed; color: #f97316;">
+                    <i class="fas fa-th-large"></i>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">👨‍🏫</div>
-                    <h3>Lecturer Management</h3>
-                    <p>Manage lecturer profiles and course assignments</p>
+                <h3>Dashboards</h3>
+                <p>Comprehensive analytics for administrators to track faculty workload and room utilization rates.</p>
+            </div>
+            <div class="feature-modern-card">
+                <div class="f-icon-box" style="background: #f5f3ff; color: #8b5cf6;">
+                    <i class="fas fa-sync"></i>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🚪</div>
-                    <h3>Room Management</h3>
-                    <p>Manage classrooms with capacity and type tracking</p>
+                <h3>Real-time Updates</h3>
+                <p>Instant push notifications for room changes or cancellations sent directly to student mobile apps.</p>
+            </div>
+            <div class="feature-modern-card">
+                <div class="f-icon-box" style="background: #f0f9ff; color: #0ea5e9;">
+                    <i class="fas fa-shapes"></i>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">⚠️</div>
-                    <h3>Conflict Detection</h3>
-                    <p>Automatic detection of scheduling conflicts</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📅</div>
-                    <h3>Timetable Management</h3>
-                    <p>Create and manage comprehensive class schedules</p>
+                <h3>Adaptive Scheduling</h3>
+                <p>System that learns from past registration trends to predict and prepare for future demand.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Preview Section -->
+    <section class="section-padding" style="background: #f1f5f9;" id="preview">
+        <div class="preview-container">
+            <div class="preview-info">
+                <h2 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 24px;">Precision Interface</h2>
+                <p class="text-muted" style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 32px;">The preview tool allows students to drag-and-drop elective courses and see immediate impact on their weekly flow, including travel times between faculties.</p>
+                <ul style="list-style: none; display: grid; gap: 16px;">
+                    <li style="display: flex; align-items: center; gap: 12px; font-weight: 600;">
+                        <i class="fas fa-check-circle" style="color: var(--primary);"></i> iCal/Google Calendar Integration
+                    </li>
+                    <li style="display: flex; align-items: center; gap: 12px; font-weight: 600;">
+                        <i class="fas fa-check-circle" style="color: var(--primary);"></i> Walking Time Optimization
+                    </li>
+                </ul>
+            </div>
+            <div class="preview-visual">
+                <div class="timetable-mini-grid">
+                    <div class="t-header">Time</div>
+                    <div class="t-header">Mon</div>
+                    <div class="t-header">Tue</div>
+                    <div class="t-header">Wed</div>
+                    
+                    <div class="t-header">09:00</div>
+                    <div class="t-block" style="background: #eef2ff; color: #4338ca; border-color: #6366f1;">Advanced AI</div>
+                    <div class="t-cell"></div>
+                    <div class="t-block" style="background: #e0f2fe; color: #0369a1; border-color: #0ea5e9;">Logic Systems</div>
+
+                    <div class="t-header">11:00</div>
+                    <div class="t-cell"></div>
+                    <div class="t-block" style="background: #f5f3ff; color: #6d28d9; border-color: #8b5cf6;">Quantum Comp</div>
+                    <div class="t-cell"></div>
+
+                    <div class="t-header">12:00</div>
+                    <div class="t-cell" style="grid-column: span 3; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; color: var(--text-secondary);">
+                        Campus Break / Networking
+                    </div>
                 </div>
             </div>
-        </section>
-        
-        <footer>
-            <p>&copy; 2024 Landmark Metropolitan University. All rights reserved.</p>
-        </footer>
+        </div>
+    </section>
+
+    <!-- Stats Banner -->
+    <div class="stats-banner">
+        <div class="stat-item">
+            <h3>98%</h3>
+            <p>Conflict Reduction</p>
+        </div>
+        <div class="stat-item">
+            <h3>1.2s</h3>
+            <p>Query Response</p>
+        </div>
+        <div class="stat-item">
+            <h3>15k</h3>
+            <p>Active Students</p>
+        </div>
+        <div class="stat-item">
+            <h3>24/7</h3>
+            <p>Live Updates</p>
+        </div>
     </div>
+
+    <!-- Footer CTA -->
+    <section class="footer-cta">
+        <div class="cta-content">
+            <h2>Ready to optimize your campus?</h2>
+            <a href="Signup.html" class="btn btn-white" style="padding: 18px 40px; font-weight: 700; color: var(--primary);">Request a Demo</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer id="footer" style="background: #f8fafc; color: var(--text-secondary); padding: 60px 10%; border-top: 1px solid var(--border-color); text-align: left;">
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 40px;">
+            <div style="max-width: 300px;">
+                <h3 style="color: var(--text-main); margin-bottom: 16px;">UniTime</h3>
+                <p style="font-size: 0.9rem; line-height: 1.6;">© 2024 University Timetable Management System. All rights reserved.</p>
+            </div>
+            <div style="display: flex; gap: 40px;">
+                <a href="#" class="nav-link">Privacy Policy</a>
+                <a href="#" class="nav-link">Terms of Service</a>
+                <a href="#" class="nav-link">Accessibility</a>
+                <a href="#" class="nav-link">Support</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/shared-navbar.js"></script>
 </body>
 </html>
