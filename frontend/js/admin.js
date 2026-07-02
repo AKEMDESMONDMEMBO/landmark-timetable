@@ -2419,13 +2419,20 @@ function generatePDFTable(doc, headers, rows) {
 
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.2);
-    doc.setFillColor(255, 255, 255);
     doc.setTextColor(0, 0, 0);
     doc.setFont(undefined, 'bold');
     const headerCellLines = headers.map((header, index) => splitText(header, columnWidths[index] - 4));
     const headerHeight = Math.max(...headerCellLines.map(lines => lines.length)) * lineHeight + 6;
     headers.forEach((header, index) => {
-        doc.rect(columnX[index], cursorY - 5, columnWidths[index], headerHeight, 'FD');
+        // Draw white background first
+        doc.setFillColor(255, 255, 255);
+        doc.rect(columnX[index], cursorY - 5, columnWidths[index], headerHeight, 'F');
+        // Draw black border
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.2);
+        doc.rect(columnX[index], cursorY - 5, columnWidths[index], headerHeight, 'S');
+        // Draw text
+        doc.setTextColor(0, 0, 0);
         const prevFontSize = doc.internal.getFontSize();
         doc.setFontSize(10);
         const headerY = cursorY + 5;
@@ -2446,10 +2453,17 @@ function generatePDFTable(doc, headers, rows) {
             cursorY = startY;
         }
 
-        doc.setFillColor(255, 255, 255);
         headers.forEach((key, index) => {
             const lines = cellLines[index];
-            doc.rect(columnX[index], cursorY - 5, columnWidths[index], rowHeightPixels, 'FD');
+            // Draw white background first
+            doc.setFillColor(255, 255, 255);
+            doc.rect(columnX[index], cursorY - 5, columnWidths[index], rowHeightPixels, 'F');
+            // Draw black border
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.2);
+            doc.rect(columnX[index], cursorY - 5, columnWidths[index], rowHeightPixels, 'S');
+            // Draw text
+            doc.setTextColor(0, 0, 0);
             doc.text(lines, columnX[index] + 2, cursorY);
         });
         cursorY += rowHeightPixels;
