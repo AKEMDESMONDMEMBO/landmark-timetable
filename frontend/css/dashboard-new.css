@@ -292,33 +292,34 @@
 
 .timetable-table th,
 .timetable-table td {
-    border: 1px solid var(--border-color);
+    border: 1px solid #000000;
     padding: var(--spacing-4);
     vertical-align: top;
 }
 
 .timetable-table th {
-    background: #F8FAFC;
-    color: #1E293B;
+    background: #FFFFFF;
+    color: #000000;
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
-    text-align: left;
-    border-bottom: 2px solid var(--border-color);
+    text-align: center;
+    border: 1px solid #000000;
 }
 
 .timetable-table td.time-slot {
-    background: #F8FAFC;
-    color: #1E293B;
+    background: #FFFFFF;
+    color: #000000;
     font-weight: 700;
     width: 140px;
     white-space: nowrap;
-    border-right: 2px solid var(--border-color);
+    border: 1px solid #000000;
 }
 
 .timetable-table td {
     min-height: 120px;
-    background: white;
+    background: #FFFFFF;
+    border: 1px solid #000000;
     transition: background-color 0.2s ease;
 }
 
@@ -349,8 +350,8 @@
 }
 
 .grid-cell.header {
-    background: #F8FAFC;
-    color: #1E293B;
+    background: #FFFFFF;
+    color: #000000;
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -359,15 +360,16 @@
     align-items: center;
     justify-content: center;
     min-height: 50px;
+    border: 1px solid #000000;
 }
 
 .grid-cell.time {
-    background: #F8FAFC;
-    color: #1E293B;
+    background: #FFFFFF;
+    color: #000000;
     font-size: 0.75rem;
     font-weight: 600;
     text-align: center;
-    border-right: 2px solid var(--border-color);
+    border: 1px solid #000000;
 }
 
 .course-card {
@@ -704,16 +706,16 @@
     }
 
     .timetable-table th {
-        background: #F8FAFC !important;
-        color: #000 !important;
-        border: 1px solid #000 !important;
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #000000 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
 
     .timetable-table td {
-        border: 1px solid #000 !important;
-        background: white !important;
+        border: 1px solid #000000 !important;
+        background: #FFFFFF !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }

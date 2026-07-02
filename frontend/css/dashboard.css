@@ -168,13 +168,13 @@
 
 .timetable-cell.header {
     min-height: 50px;
-    background: var(--bg-main);
-    color: #1E293B;
+    background: #FFFFFF;
+    color: #000000;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
     align-items: center;
-    border: none;
+    border: 1px solid #000000;
 }
 
 .timetable-cell.time-slot {

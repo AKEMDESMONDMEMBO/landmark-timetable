@@ -796,11 +796,11 @@ function generatePDFTable(doc, headers, rows) {
     doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, margin, 28);
     doc.setTextColor(0, 0, 0);
 
-    // Table header with background
+    // Table header with white background
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.2);
-    doc.setFillColor(248, 250, 252);
-    doc.setTextColor(30, 41, 59);
+    doc.setFillColor(255, 255, 255);
+    doc.setTextColor(0, 0, 0);
     doc.setFont(undefined, 'bold');
     const headerCellLines = headers.map((header, index) => splitText(header, columnWidths[index] - 4));
     const headerHeight = Math.max(...headerCellLines.map(lines => lines.length)) * lineHeight + 6;
@@ -816,7 +816,7 @@ function generatePDFTable(doc, headers, rows) {
     
     // Table rows
     doc.setFont(undefined, 'normal');
-    doc.setTextColor(30, 41, 59);
+    doc.setTextColor(0, 0, 0);
     let rowCount = 0;
 
     rows.forEach((row) => {
@@ -829,8 +829,8 @@ function generatePDFTable(doc, headers, rows) {
             cursorY = startY;
             
             // Repeat header on new page
-            doc.setFillColor(248, 250, 252);
-            doc.setTextColor(30, 41, 59);
+            doc.setFillColor(255, 255, 255);
+            doc.setTextColor(0, 0, 0);
             doc.setFont(undefined, 'bold');
             headers.forEach((header, index) => {
                 doc.rect(columnX[index], cursorY - 5, columnWidths[index], headerHeight, 'FD');
@@ -841,15 +841,11 @@ function generatePDFTable(doc, headers, rows) {
             });
             cursorY += headerHeight;
             doc.setFont(undefined, 'normal');
-            doc.setTextColor(30, 41, 59);
+            doc.setTextColor(0, 0, 0);
         }
 
-        // Alternate row background
-        if (rowCount % 2 === 0) {
-            doc.setFillColor(255, 255, 255);
-        } else {
-            doc.setFillColor(248, 250, 252);
-        }
+        // All rows with white background
+        doc.setFillColor(255, 255, 255);
 
         headers.forEach((key, index) => {
             const lines = cellLines[index];
