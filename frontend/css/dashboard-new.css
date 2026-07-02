@@ -275,6 +275,7 @@
     border: 1px solid var(--border-color);
     overflow: hidden;
     margin-top: var(--spacing-6);
+    box-shadow: var(--shadow-sm);
 }
 
 .timetable-grid-new {
@@ -298,24 +299,31 @@
 
 .timetable-table th {
     background: #F8FAFC;
-    color: var(--text-secondary);
+    color: #1E293B;
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     text-align: left;
+    border-bottom: 2px solid var(--border-color);
 }
 
 .timetable-table td.time-slot {
     background: #F8FAFC;
-    color: var(--text-secondary);
+    color: #1E293B;
     font-weight: 700;
     width: 140px;
     white-space: nowrap;
+    border-right: 2px solid var(--border-color);
 }
 
 .timetable-table td {
     min-height: 120px;
     background: white;
+    transition: background-color 0.2s ease;
+}
+
+.timetable-table td:hover {
+    background-color: #F8FAFC;
 }
 
 .timetable-table .course-card {
@@ -342,7 +350,7 @@
 
 .grid-cell.header {
     background: #F8FAFC;
-    color: var(--text-secondary);
+    color: #1E293B;
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -355,7 +363,7 @@
 
 .grid-cell.time {
     background: #F8FAFC;
-    color: var(--text-secondary);
+    color: #1E293B;
     font-size: 0.75rem;
     font-weight: 600;
     text-align: center;
@@ -659,3 +667,70 @@
     to { transform: rotate(360deg); }
 }
 
+/* Print Styles for Timetable */
+@media print {
+    .new-sidebar,
+    .top-nav,
+    .optimizer-panel,
+    .stats-grid,
+    .page-header .breadcrumb,
+    .page-header .flex button:not([onclick*="printTimetable"]):not([onclick*="exportTimetableToPDF"]),
+    #filterSchool,
+    #filterDepartment,
+    #filterLevel {
+        display: none !important;
+    }
+
+    .main-wrapper {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+
+    .content-padding {
+        padding: 1rem !important;
+    }
+
+    .page-header {
+        margin-bottom: 1rem !important;
+    }
+
+    .timetable-container {
+        border: 1px solid #000 !important;
+        box-shadow: none !important;
+    }
+
+    .timetable-table {
+        font-size: 10pt !important;
+    }
+
+    .timetable-table th {
+        background: #F8FAFC !important;
+        color: #000 !important;
+        border: 1px solid #000 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .timetable-table td {
+        border: 1px solid #000 !important;
+        background: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .course-card {
+        border: 1px solid #000 !important;
+        page-break-inside: avoid;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #000 !important;
+    }
+
+    body {
+        background: white !important;
+    }
+}

@@ -169,7 +169,7 @@
 .timetable-cell.header {
     min-height: 50px;
     background: var(--bg-main);
-    color: var(--text-secondary);
+    color: #1E293B;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;

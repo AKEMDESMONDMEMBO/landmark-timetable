@@ -769,7 +769,7 @@ async function ensurePdfLibrary() {
 function generatePDFTable(doc, headers, rows) {
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
-    const startY = 25;
+    const startY = 35;
     const rowHeight = 8;
     const maxWidth = pageWidth - margin * 2;
     const columnWidths = [28, 60, 50, 35, 25, 25, 35];
@@ -782,29 +782,42 @@ function generatePDFTable(doc, headers, rows) {
     const lineHeight = 6;
     let cursorY = startY;
 
-    doc.setFontSize(12);
-    doc.text('Landmark Metropolitan University - Timetable', margin, 15);
+    // Title and metadata
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('Landmark Metropolitan University', margin, 15);
+    
+    doc.setFontSize(14);
+    doc.text('Academic Timetable', margin, 22);
+    
     doc.setFontSize(9);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, margin, 20);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, margin, 28);
+    doc.setTextColor(0, 0, 0);
 
+    // Table header with background
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.2);
-    doc.setFillColor(255, 255, 255);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont(undefined, 'normal');
+    doc.setFillColor(248, 250, 252);
+    doc.setTextColor(30, 41, 59);
+    doc.setFont(undefined, 'bold');
     const headerCellLines = headers.map((header, index) => splitText(header, columnWidths[index] - 4));
     const headerHeight = Math.max(...headerCellLines.map(lines => lines.length)) * lineHeight + 6;
     headers.forEach((header, index) => {
-        doc.rect(columnX[index], cursorY - 5, columnWidths[index], headerHeight, 'F');
+        doc.rect(columnX[index], cursorY - 5, columnWidths[index], headerHeight, 'FD');
         const prevFontSize = doc.internal.getFontSize();
-        doc.setFontSize(10);
+        doc.setFontSize(9);
         const headerY = cursorY + 5;
         doc.text(headerCellLines[index], columnX[index] + 2, headerY);
         doc.setFontSize(prevFontSize);
     });
     cursorY += headerHeight;
+    
+    // Table rows
     doc.setFont(undefined, 'normal');
-    doc.setTextColor(17, 24, 39);
+    doc.setTextColor(30, 41, 59);
+    let rowCount = 0;
 
     rows.forEach((row) => {
         const cellLines = headers.map((key, index) => splitText(row[key], columnWidths[index] - 4));
@@ -814,15 +827,47 @@ function generatePDFTable(doc, headers, rows) {
         if (cursorY + rowHeightPixels > doc.internal.pageSize.getHeight() - margin) {
             doc.addPage();
             cursorY = startY;
+            
+            // Repeat header on new page
+            doc.setFillColor(248, 250, 252);
+            doc.setTextColor(30, 41, 59);
+            doc.setFont(undefined, 'bold');
+            headers.forEach((header, index) => {
+                doc.rect(columnX[index], cursorY - 5, columnWidths[index], headerHeight, 'FD');
+                const prevFontSize = doc.internal.getFontSize();
+                doc.setFontSize(9);
+                doc.text(headerCellLines[index], columnX[index] + 2, cursorY + 5);
+                doc.setFontSize(prevFontSize);
+            });
+            cursorY += headerHeight;
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(30, 41, 59);
+        }
+
+        // Alternate row background
+        if (rowCount % 2 === 0) {
+            doc.setFillColor(255, 255, 255);
+        } else {
+            doc.setFillColor(248, 250, 252);
         }
 
         headers.forEach((key, index) => {
             const lines = cellLines[index];
-            doc.rect(columnX[index], cursorY - 5, columnWidths[index], rowHeightPixels, 'S');
+            doc.rect(columnX[index], cursorY - 5, columnWidths[index], rowHeightPixels, 'FD');
             doc.text(lines, columnX[index] + 2, cursorY);
         });
         cursorY += rowHeightPixels;
+        rowCount++;
     });
+
+    // Footer with page numbers
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 30, doc.internal.pageSize.getHeight() - 10);
+    }
 }
 
 async function exportTimetableToPDF() {
