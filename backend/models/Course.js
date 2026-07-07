@@ -39,27 +39,38 @@ class Course {
                 course_name VARCHAR(255) NOT NULL,
                 credits INTEGER DEFAULT 3,
                 department_id INTEGER REFERENCES departments(id) ON DELETE CASCADE,
+                specialty_id INTEGER,
                 level_id INTEGER REFERENCES levels(id) ON DELETE SET NULL,
                 semester INTEGER CHECK (semester IN (1, 2)),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
+        await pool.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='courses' AND column_name='specialty_id') THEN
+                    ALTER TABLE courses ADD COLUMN specialty_id INTEGER;
+                END IF;
+            END $$;
+        `);
     }
 
     static async create(courseData) {
-        const { course_code, course_name, credits, department_id, level_id, semester } = courseData;
+        const { course_code, course_name, credits, department_id, specialty_id, level_id, semester } = courseData;
         const result = await pool.query(
-            'INSERT INTO courses (course_code, course_name, credits, department_id, level_id, semester) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [course_code, course_name, credits, department_id, level_id, semester]
+            'INSERT INTO courses (course_code, course_name, credits, department_id, specialty_id, level_id, semester) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+            [course_code, course_name, credits, department_id, specialty_id || null, level_id, semester]
         );
         return result.rows[0];
     }
 
     static async findAll() {
         const result = await pool.query(
-            `SELECT c.*, d.name as department_name, l.level_number, l.name as level_name
+            `SELECT c.*, d.name as department_name, s.name as specialty_name, l.level_number, l.name as level_name
              FROM courses c
              LEFT JOIN departments d ON c.department_id = d.id
+             LEFT JOIN specialties s ON c.specialty_id = s.id
              LEFT JOIN levels l ON c.level_id = l.id
              ORDER BY c.course_code`
         );
@@ -68,9 +79,10 @@ class Course {
 
     static async findById(id) {
         const result = await pool.query(
-            `SELECT c.*, d.name as department_name, l.level_number, l.name as level_name
+            `SELECT c.*, d.name as department_name, s.name as specialty_name, l.level_number, l.name as level_name
              FROM courses c
              LEFT JOIN departments d ON c.department_id = d.id
+             LEFT JOIN specialties s ON c.specialty_id = s.id
              LEFT JOIN levels l ON c.level_id = l.id
              WHERE c.id = $1`,
             [id]
@@ -79,10 +91,10 @@ class Course {
     }
 
     static async update(id, courseData) {
-        const { course_code, course_name, credits, department_id, level_id, semester } = courseData;
+        const { course_code, course_name, credits, department_id, specialty_id, level_id, semester } = courseData;
         const result = await pool.query(
-            'UPDATE courses SET course_code = $1, course_name = $2, credits = $3, department_id = $4, level_id = $5, semester = $6 WHERE id = $7 RETURNING *',
-            [course_code, course_name, credits, department_id, level_id, semester, id]
+            'UPDATE courses SET course_code = $1, course_name = $2, credits = $3, department_id = $4, specialty_id = $5, level_id = $6, semester = $7 WHERE id = $8 RETURNING *',
+            [course_code, course_name, credits, department_id, specialty_id || null, level_id, semester, id]
         );
         return result.rows[0];
     }

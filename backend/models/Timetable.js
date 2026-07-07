@@ -94,12 +94,19 @@ class Timetable {
 
     static async findByLecturer(lecturerId) {
         const result = await pool.query(
-            `SELECT t.*, c.course_code, c.course_name, r.room_number, r.capacity AS room_capacity, l.level_number, l.name as level_name, ts.day_of_week, ts.start_time, ts.end_time
+            `SELECT t.*, c.course_code, c.course_name, c.department_id, d.name as department_name, d.school_id, s.name as school_name,
+                    r.room_number, r.capacity AS room_capacity, l.level_number, l.name as level_name, ts.day_of_week, ts.start_time, ts.end_time,
+                    sp.id as specialty_id, sp.name as specialty_name
              FROM timetable t
              JOIN courses c ON t.course_id = c.id
+             LEFT JOIN departments d ON c.department_id = d.id
+             LEFT JOIN schools s ON d.school_id = s.id
              JOIN rooms r ON t.room_id = r.id
              JOIN levels l ON t.level_id = l.id
              JOIN time_slots ts ON t.time_slot_id = ts.id
+             LEFT JOIN lecturers lec ON t.lecturer_id = lec.id
+             LEFT JOIN users u ON lec.user_id = u.id
+             LEFT JOIN specialties sp ON c.specialty_id = sp.id
              WHERE t.lecturer_id = $1
              ORDER BY ts.day_of_week, ts.start_time`,
             [lecturerId]
@@ -109,15 +116,20 @@ class Timetable {
 
     static async findByLevel(levelId) {
         const result = await pool.query(
-            `SELECT t.*, c.course_code, c.course_name, r.room_number, r.capacity AS room_capacity, l.level_number, l.name as level_name,
-                    ts.day_of_week, ts.start_time, ts.end_time, lec.user_id, u.full_name as lecturer_name
+            `SELECT t.*, c.course_code, c.course_name, c.department_id, d.name as department_name, d.school_id, s.name as school_name,
+                    r.room_number, r.capacity AS room_capacity, l.level_number, l.name as level_name,
+                    ts.day_of_week, ts.start_time, ts.end_time, lec.user_id, u.full_name as lecturer_name,
+                    sp.id as specialty_id, sp.name as specialty_name
              FROM timetable t
              JOIN courses c ON t.course_id = c.id
+             LEFT JOIN departments d ON c.department_id = d.id
+             LEFT JOIN schools s ON d.school_id = s.id
              JOIN rooms r ON t.room_id = r.id
              JOIN levels l ON t.level_id = l.id
              JOIN time_slots ts ON t.time_slot_id = ts.id
              JOIN lecturers lec ON t.lecturer_id = lec.id
              JOIN users u ON lec.user_id = u.id
+             LEFT JOIN specialties sp ON c.specialty_id = sp.id
              WHERE t.level_id = $1
              ORDER BY ts.day_of_week, ts.start_time`,
             [levelId]
@@ -127,15 +139,20 @@ class Timetable {
 
     static async findByDepartment(departmentId) {
         const result = await pool.query(
-            `SELECT t.*, c.course_code, c.course_name, r.room_number, r.capacity AS room_capacity, l.level_number, l.name as level_name,
-                    ts.day_of_week, ts.start_time, ts.end_time, u.full_name as lecturer_name
+            `SELECT t.*, c.course_code, c.course_name, c.department_id, d.name as department_name, d.school_id, s.name as school_name,
+                    r.room_number, r.capacity AS room_capacity, l.level_number, l.name as level_name,
+                    ts.day_of_week, ts.start_time, ts.end_time, u.full_name as lecturer_name,
+                    sp.id as specialty_id, sp.name as specialty_name
              FROM timetable t
              JOIN courses c ON t.course_id = c.id
+             LEFT JOIN departments d ON c.department_id = d.id
+             LEFT JOIN schools s ON d.school_id = s.id
              JOIN rooms r ON t.room_id = r.id
              JOIN levels l ON t.level_id = l.id
              JOIN time_slots ts ON t.time_slot_id = ts.id
              JOIN lecturers lec ON t.lecturer_id = lec.id
              JOIN users u ON lec.user_id = u.id
+             LEFT JOIN specialties sp ON c.specialty_id = sp.id
              WHERE c.department_id = $1
              ORDER BY ts.day_of_week, ts.start_time`,
             [departmentId]
@@ -145,15 +162,20 @@ class Timetable {
 
     static async findAll() {
         const result = await pool.query(
-            `SELECT t.*, c.course_code, c.course_name, r.room_number, r.capacity AS room_capacity, l.level_number, l.name as level_name,
-                    ts.day_of_week, ts.start_time, ts.end_time, u.full_name as lecturer_name
+            `SELECT t.*, c.course_code, c.course_name, c.department_id, d.name as department_name, d.school_id, s.name as school_name,
+                    r.room_number, r.capacity AS room_capacity, l.level_number, l.name as level_name,
+                    ts.day_of_week, ts.start_time, ts.end_time, u.full_name as lecturer_name,
+                    sp.id as specialty_id, sp.name as specialty_name
              FROM timetable t
              JOIN courses c ON t.course_id = c.id
+             LEFT JOIN departments d ON c.department_id = d.id
+             LEFT JOIN schools s ON d.school_id = s.id
              JOIN rooms r ON t.room_id = r.id
              JOIN levels l ON t.level_id = l.id
              JOIN time_slots ts ON t.time_slot_id = ts.id
              JOIN lecturers lec ON t.lecturer_id = lec.id
              JOIN users u ON lec.user_id = u.id
+             LEFT JOIN specialties sp ON c.specialty_id = sp.id
              ORDER BY ts.day_of_week, ts.start_time`
         );
         return result.rows;
@@ -161,15 +183,20 @@ class Timetable {
 
     static async findByStudentLevelAndDepartment(levelId, departmentId) {
         const result = await pool.query(
-            `SELECT t.*, c.course_code, c.course_name, r.room_number, r.capacity AS room_capacity, l.level_number, l.name as level_name,
-                    ts.day_of_week, ts.start_time, ts.end_time, u.full_name as lecturer_name
+            `SELECT t.*, c.course_code, c.course_name, c.department_id, d.name as department_name, d.school_id, s.name as school_name,
+                    r.room_number, r.capacity AS room_capacity, l.level_number, l.name as level_name,
+                    ts.day_of_week, ts.start_time, ts.end_time, u.full_name as lecturer_name,
+                    sp.id as specialty_id, sp.name as specialty_name
              FROM timetable t
              JOIN courses c ON t.course_id = c.id
+             LEFT JOIN departments d ON c.department_id = d.id
+             LEFT JOIN schools s ON d.school_id = s.id
              JOIN rooms r ON t.room_id = r.id
              JOIN levels l ON t.level_id = l.id
              JOIN time_slots ts ON t.time_slot_id = ts.id
              JOIN lecturers lec ON t.lecturer_id = lec.id
              JOIN users u ON lec.user_id = u.id
+             LEFT JOIN specialties sp ON c.specialty_id = sp.id
              WHERE t.level_id = $1 AND c.department_id = $2
              ORDER BY ts.day_of_week, ts.start_time`,
             [levelId, departmentId]

@@ -21,6 +21,71 @@ function formatLevelLabel(level) {
 
 window.formatLevelLabel = formatLevelLabel;
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function setupSearchableList(containerId, placeholder) {
+    const container = document.getElementById(containerId);
+    if (!container) return null;
+
+    if (!container.querySelector('.search-shell')) {
+        container.innerHTML = `
+            <div class="search-shell" style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:260px; position:relative;">
+                    <i class="fas fa-search" style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text-secondary);"></i>
+                    <input type="search" class="input-field" style="padding-left:2.5rem;" placeholder="${placeholder}">
+                </div>
+                <div class="search-count" style="color:var(--text-secondary); font-size:0.9rem;"></div>
+            </div>
+            <div class="list-body"></div>
+        `;
+    }
+
+    const searchInput = container.querySelector('input[type="search"]');
+    const countLabel = container.querySelector('.search-count');
+    const listBody = container.querySelector('.list-body');
+    return { container, searchInput, countLabel, listBody };
+}
+
+function attachSearchToTable(containerId, data, renderFn, searchFields, placeholder) {
+    const shell = setupSearchableList(containerId, placeholder);
+    if (!shell) return;
+
+    const { searchInput, countLabel, listBody } = shell;
+    if (searchInput.dataset.bound === 'true') return;
+
+    searchInput.placeholder = placeholder;
+    searchInput.dataset.bound = 'true';
+    searchInput.addEventListener('input', (event) => {
+        const query = (event.target.value || '').trim().toLowerCase();
+        const filtered = data.filter((item) => {
+            const matches = searchFields.map((field) => {
+                const value = typeof field === 'function' ? field(item) : (item[field] ?? '');
+                return String(value).toLowerCase();
+            });
+            return matches.some((value) => value.includes(query));
+        });
+
+        renderFn(filtered);
+        if (countLabel) {
+            countLabel.textContent = `${filtered.length} record${filtered.length === 1 ? '' : 's'}`;
+        }
+    });
+}
+
+function focusFirstField(fieldId) {
+    setTimeout(() => {
+        const field = document.getElementById(fieldId);
+        if (field) field.focus();
+    }, 120);
+}
+
 // Modal Management
 function createModal(id, title, content) {
     // Remove existing modal with same ID if any
@@ -129,7 +194,23 @@ async function loadSchools() {
 }
 
 function renderSchoolsTable(schools) {
-    const html = `
+    const shell = setupSearchableList('schoolsList', 'Search schools by name, code, or description');
+    if (!shell) return;
+
+    const { listBody, countLabel, searchInput } = shell;
+    if (countLabel) {
+        countLabel.textContent = `${schools.length} record${schools.length === 1 ? '' : 's'}`;
+    }
+    if (searchInput && searchInput.value) {
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
+
+    if (!schools.length) {
+        listBody.innerHTML = '<div class="card" style="padding: 24px; text-align:center; color:var(--text-secondary);">No schools match your search.</div>';
+        return;
+    }
+
+    listBody.innerHTML = `
         <div class="table-responsive">
             <table class="data-table">
                 <thead>
@@ -143,12 +224,12 @@ function renderSchoolsTable(schools) {
                 <tbody>
                     ${schools.map(school => `
                         <tr>
-                            <td style="font-weight: 600;">${school.name || 'N/A'}</td>
-                            <td><span class="badge">${school.code || school.school_code || 'N/A'}</span></td>
-                            <td style="color: var(--text-secondary); font-size: 0.8rem;">${school.description || 'No description'}</td>
+                            <td style="font-weight: 600;">${escapeHtml(school.name || 'N/A')}</td>
+                            <td><span class="badge">${escapeHtml(school.code || school.school_code || 'N/A')}</span></td>
+                            <td style="color: var(--text-secondary); font-size: 0.8rem;">${escapeHtml(school.description || 'No description')}</td>
                             <td style="text-align: right;">
                                 <div class="flex justify-end gap-2">
-                                    <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="editSchool(${school.id}, '${school.name}', '${school.code}', '${school.description || ''}')">
+                                    <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="editSchool(${school.id}, '${escapeHtml(school.name || '')}', '${escapeHtml(school.code || '')}', '${escapeHtml(school.description || '')}')">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-outline btn-sm" style="color: var(--error);" onclick="deleteSchool(${school.id})">
@@ -162,7 +243,6 @@ function renderSchoolsTable(schools) {
             </table>
         </div>
     `;
-    document.getElementById('schoolsList').innerHTML = html;
 }
 
 
@@ -201,6 +281,7 @@ function openModalSchoolCreate() {
     `;
     createModal('schoolModal', 'Create New School', content);
     openModal('schoolModal');
+    focusFirstField('schoolName');
 }
 
 async function saveSchool(event) {
@@ -363,7 +444,23 @@ async function loadDepartments() {
 }
 
 function renderDepartmentsTable(departments) {
-    const html = `
+    const shell = setupSearchableList('departmentsList', 'Search departments by name, code, or school');
+    if (!shell) return;
+
+    const { listBody, countLabel, searchInput } = shell;
+    if (countLabel) {
+        countLabel.textContent = `${departments.length} record${departments.length === 1 ? '' : 's'}`;
+    }
+    if (searchInput && searchInput.value) {
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
+
+    if (!departments.length) {
+        listBody.innerHTML = '<div class="card" style="padding: 24px; text-align:center; color:var(--text-secondary);">No departments match your search.</div>';
+        return;
+    }
+
+    listBody.innerHTML = `
         <div class="table-responsive">
             <table class="data-table">
                 <thead>
@@ -379,14 +476,14 @@ function renderDepartmentsTable(departments) {
                 <tbody>
                     ${departments.map(dept => `
                         <tr>
-                            <td style="font-weight: 600;">${dept.name || 'N/A'}</td>
-                            <td><span class="badge">${dept.code || dept.dept_code || 'N/A'}</span></td>
-                            <td>${dept.school_name || '<span class="text-muted">No School</span>'}</td>
-                            <td style="color: var(--text-secondary); font-size: 0.8rem;">${dept.description || 'No description'}</td>
+                            <td style="font-weight: 600;">${escapeHtml(dept.name || 'N/A')}</td>
+                            <td><span class="badge">${escapeHtml(dept.code || dept.dept_code || 'N/A')}</span></td>
+                            <td>${escapeHtml(dept.school_name || 'No School')}</td>
+                            <td style="color: var(--text-secondary); font-size: 0.8rem;">${escapeHtml(dept.description || 'No description')}</td>
                             <td><span class="badge" style="background-color: #F1F5F9; color: var(--text-main);">${dept.specialty_count || 0}</span></td>
                             <td style="text-align: right;">
                                 <div class="flex justify-end gap-2">
-                                    <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="editDepartment(${dept.id}, '${dept.name}', '${dept.code}', '${dept.description || ''}', ${dept.school_id})">
+                                    <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="editDepartment(${dept.id}, '${escapeHtml(dept.name || '')}', '${escapeHtml(dept.code || '')}', '${escapeHtml(dept.description || '')}', ${dept.school_id})">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-outline btn-sm" style="color: var(--error);" onclick="deleteDepartment(${dept.id})">
@@ -400,7 +497,6 @@ function renderDepartmentsTable(departments) {
             </table>
         </div>
     `;
-    document.getElementById('departmentsList').innerHTML = html;
 }
 
 
@@ -454,6 +550,7 @@ async function openModalDeptCreate() {
     `;
     createModal('deptModal', 'Create New Department', content);
     openModal('deptModal');
+    focusFirstField('deptName');
 }
 
 async function saveDepartment(event) {
@@ -627,7 +724,23 @@ async function loadSpecialties() {
 }
 
 function renderSpecialtiesTable(specialties) {
-    const html = `
+    const shell = setupSearchableList('specialtiesList', 'Search specialties by name, code, or department');
+    if (!shell) return;
+
+    const { listBody, countLabel, searchInput } = shell;
+    if (countLabel) {
+        countLabel.textContent = `${specialties.length} record${specialties.length === 1 ? '' : 's'}`;
+    }
+    if (searchInput && searchInput.value) {
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
+
+    if (!specialties.length) {
+        listBody.innerHTML = '<div class="card" style="padding: 24px; text-align:center; color:var(--text-secondary);">No specialties match your search.</div>';
+        return;
+    }
+
+    listBody.innerHTML = `
         <div class="table-responsive">
             <table class="data-table">
                 <thead>
@@ -642,13 +755,13 @@ function renderSpecialtiesTable(specialties) {
                 <tbody>
                     ${specialties.map(spec => `
                         <tr>
-                            <td style="font-weight: 600;">${spec.name || 'N/A'}</td>
-                            <td><span class="badge">${spec.code || spec.specialty_code || 'N/A'}</span></td>
-                            <td>${spec.department_name || 'N/A'}</td>
-                            <td>${spec.school_name || 'N/A'}</td>
+                            <td style="font-weight: 600;">${escapeHtml(spec.name || 'N/A')}</td>
+                            <td><span class="badge">${escapeHtml(spec.code || spec.specialty_code || 'N/A')}</span></td>
+                            <td>${escapeHtml(spec.department_name || 'N/A')}</td>
+                            <td>${escapeHtml(spec.school_name || 'N/A')}</td>
                             <td style="text-align: right;">
                                 <div class="flex justify-end gap-2">
-                                    <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="editSpecialty(${spec.id}, '${spec.name}', '${spec.code}', ${spec.department_id}, ${spec.school_id})">
+                                    <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="editSpecialty(${spec.id}, '${escapeHtml(spec.name || '')}', '${escapeHtml(spec.code || '')}', ${spec.department_id}, ${spec.school_id})">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-outline btn-sm" style="color: var(--error);" onclick="deleteSpecialty(${spec.id})">
@@ -662,7 +775,6 @@ function renderSpecialtiesTable(specialties) {
             </table>
         </div>
     `;
-    document.getElementById('specialtiesList').innerHTML = html;
 }
 
 
@@ -725,6 +837,7 @@ async function openModalSpecCreate() {
 
     createModal('specModal', 'Create New Specialty', content);
     openModal('specModal');
+    focusFirstField('specName');
 }
 
 function filterDepartmentsBySchool(schoolId, targetId) {
@@ -893,6 +1006,26 @@ async function loadCourses() {
         </div>
 
         <div class="card">
+            <div class="flex flex-wrap gap-3" style="margin-bottom: 0.75rem;">
+                <div class="form-group" style="min-width: 210px; flex: 1;">
+                    <label style="font-size: 0.8rem; margin-bottom: 0.35rem; display: block;">School</label>
+                    <select id="filterCourseSchool" class="input-field" style="padding-left: 1rem; appearance: auto;">
+                        <option value="">All Schools</option>
+                    </select>
+                </div>
+                <div class="form-group" style="min-width: 210px; flex: 1;">
+                    <label style="font-size: 0.8rem; margin-bottom: 0.35rem; display: block;">Department</label>
+                    <select id="filterCourseDepartment" class="input-field" style="padding-left: 1rem; appearance: auto;">
+                        <option value="">All Departments</option>
+                    </select>
+                </div>
+                <div class="form-group" style="min-width: 210px; flex: 1;">
+                    <label style="font-size: 0.8rem; margin-bottom: 0.35rem; display: block;">Specialty</label>
+                    <select id="filterCourseSpecialty" class="input-field" style="padding-left: 1rem; appearance: auto;">
+                        <option value="">All Specialties</option>
+                    </select>
+                </div>
+            </div>
             <div id="coursesList" style="overflow-x: auto;">
                 <div style="display: flex; align-items: center; justify-content: center; height: 200px;">
                     <div class="spinner"></div>
@@ -902,22 +1035,118 @@ async function loadCourses() {
     `;
     
     try {
-        const response = await fetch(`${API_URL}/courses`, {
-            headers: getAuthHeaders()
-        });
-        const data = await response.json();
+        const [courseResponse, schoolResponse, departmentResponse, specialtyResponse] = await Promise.all([
+            fetch(`${API_URL}/courses`, { headers: getAuthHeaders() }),
+            fetch(`${API_URL}/schools`, { headers: getAuthHeaders() }),
+            fetch(`${API_URL}/departments`, { headers: getAuthHeaders() }),
+            fetch(`${API_URL}/specialties`, { headers: getAuthHeaders() })
+        ]);
+        const [courseData, schoolData, departmentData, specialtyData] = await Promise.all([
+            courseResponse.json(),
+            schoolResponse.json(),
+            departmentResponse.json(),
+            specialtyResponse.json()
+        ]);
         
-        if (data.success) {
-            window.allCourses = data.data;
-            renderCoursesTable(data.data);
+        if (courseData.success) {
+            window.allCourses = courseData.data || [];
+            window.allCourseSchools = schoolData.data || [];
+            window.allCourseDepartments = departmentData.data || [];
+            window.allCourseSpecialties = specialtyData.data || [];
+            populateCourseFilters();
+            renderCoursesTable(applyCourseFilters(window.allCourses));
         }
     } catch (error) {
         document.getElementById('coursesList').innerHTML = `<p class="error">Error loading courses</p>`;
     }
 }
 
+function populateCourseFilters() {
+    const schoolSelect = document.getElementById('filterCourseSchool');
+    const departmentSelect = document.getElementById('filterCourseDepartment');
+    const specialtySelect = document.getElementById('filterCourseSpecialty');
+    if (!schoolSelect || !departmentSelect || !specialtySelect) return;
+
+    const selectedSchoolId = schoolSelect.value || '';
+    const selectedDepartmentId = departmentSelect.value || '';
+    const selectedSpecialtyId = specialtySelect.value || '';
+
+    const departments = (window.allCourseDepartments || []).filter((department) => !selectedSchoolId || String(department.school_id) === String(selectedSchoolId));
+    const validDepartmentId = departments.some((department) => String(department.id) === String(selectedDepartmentId)) ? selectedDepartmentId : '';
+
+    const specialties = (window.allCourseSpecialties || []).filter((specialty) => {
+        const matchesDepartment = !validDepartmentId || String(specialty.department_id) === String(validDepartmentId);
+        const matchesSchool = !selectedSchoolId || String(specialty.school_id) === String(selectedSchoolId);
+        return matchesDepartment && matchesSchool;
+    });
+    const validSpecialtyId = specialties.some((specialty) => String(specialty.id) === String(selectedSpecialtyId)) ? selectedSpecialtyId : '';
+
+    schoolSelect.innerHTML = `<option value="">All Schools</option>${(window.allCourseSchools || []).map((school) => `<option value="${school.id}" ${selectedSchoolId === String(school.id) ? 'selected' : ''}>${school.name}</option>`).join('')}`;
+    departmentSelect.innerHTML = `<option value="">All Departments</option>${departments.map((department) => `<option value="${department.id}" ${validDepartmentId === String(department.id) ? 'selected' : ''}>${department.name}</option>`).join('')}`;
+    specialtySelect.innerHTML = `<option value="">All Specialties</option>${specialties.map((specialty) => `<option value="${specialty.id}" ${validSpecialtyId === String(specialty.id) ? 'selected' : ''}>${specialty.name}</option>`).join('')}`;
+
+    [schoolSelect, departmentSelect, specialtySelect].forEach((select) => {
+        select.onchange = () => {
+            populateCourseFilters();
+            renderCoursesTable(applyCourseFilters(window.allCourses || []));
+        };
+    });
+}
+
+function applyCourseFilters(courses) {
+    const schoolId = document.getElementById('filterCourseSchool')?.value || '';
+    const departmentId = document.getElementById('filterCourseDepartment')?.value || '';
+    const specialtyId = document.getElementById('filterCourseSpecialty')?.value || '';
+    const selectedSpecialty = (window.allCourseSpecialties || []).find((specialty) => String(specialty.id) === String(specialtyId));
+    const specialtyDepartmentId = selectedSpecialty?.department_id || '';
+    const specialtySchoolId = selectedSpecialty?.school_id || '';
+    const specialtyName = selectedSpecialty?.name || '';
+    const specialtyCode = selectedSpecialty?.code || '';
+
+    return (courses || []).filter((course) => {
+        const courseDepartment = (window.allCourseDepartments || []).find((department) => String(department.id) === String(course.department_id));
+        const courseSchoolId = courseDepartment ? courseDepartment.school_id : null;
+        const courseSpecialtyId = course.specialty_id ?? course.course_specialty_id ?? '';
+        const courseSpecialtyName = course.specialty_name || course.course_specialty_name || '';
+        const schoolOk = !schoolId || String(courseSchoolId) === String(schoolId);
+        const departmentOk = !departmentId || String(course.department_id) === String(departmentId);
+        const matchesSpecialtyDirectly = Boolean(
+            specialtyId && (
+                (courseSpecialtyId != null && courseSpecialtyId !== '' && String(courseSpecialtyId) === String(specialtyId)) ||
+                (courseSpecialtyName && specialtyName && String(courseSpecialtyName).toLowerCase() === String(specialtyName).toLowerCase()) ||
+                (courseSpecialtyName && specialtyCode && String(courseSpecialtyName).toLowerCase() === String(specialtyCode).toLowerCase())
+            )
+        );
+        const matchesSpecialtyContext = Boolean(
+            specialtyId &&
+            specialtyDepartmentId &&
+            course.department_id &&
+            String(course.department_id) === String(specialtyDepartmentId) &&
+            (!specialtySchoolId || !courseSchoolId || String(courseSchoolId) === String(specialtySchoolId))
+        );
+        const specialtyOk = !specialtyId || matchesSpecialtyDirectly || matchesSpecialtyContext;
+        return schoolOk && departmentOk && specialtyOk;
+    });
+}
+
 function renderCoursesTable(courses) {
-    const html = `
+    const shell = setupSearchableList('coursesList', 'Search courses by code, name, department, specialty, or level');
+    if (!shell) return;
+
+    const { listBody, countLabel, searchInput } = shell;
+    if (countLabel) {
+        countLabel.textContent = `${courses.length} record${courses.length === 1 ? '' : 's'}`;
+    }
+    if (searchInput && searchInput.value) {
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
+
+    if (!courses.length) {
+        listBody.innerHTML = '<div class="card" style="padding: 24px; text-align:center; color:var(--text-secondary);">No courses match your search.</div>';
+        return;
+    }
+
+    listBody.innerHTML = `
         <div class="table-responsive">
             <table class="data-table">
             <thead>
@@ -926,6 +1155,7 @@ function renderCoursesTable(courses) {
                     <th>Course Name</th>
                     <th>Credits</th>
                     <th>Department</th>
+                    <th>Specialty / Scope</th>
                     <th>Level</th>
                     <th>Semester</th>
                     <th style="text-align: right;">Actions</th>
@@ -934,11 +1164,12 @@ function renderCoursesTable(courses) {
             <tbody>
                 ${courses.map(course => `
                     <tr>
-                        <td><span class="badge" style="background-color: var(--primary-light); color: var(--primary); font-weight: 800;">${course.course_code}</span></td>
-                        <td style="font-weight: 600;">${course.course_name}</td>
+                        <td><span class="badge" style="background-color: var(--primary-light); color: var(--primary); font-weight: 800;">${escapeHtml(course.course_code)}</span></td>
+                        <td style="font-weight: 600;">${escapeHtml(course.course_name)}</td>
                         <td>${course.credits} Units</td>
-                        <td style="color: var(--text-secondary);">${course.department_name || 'N/A'}</td>
-                        <td><span class="badge" style="background-color: #F1F5F9; color: var(--text-main);">${formatLevelLabel(course) || 'N/A'}</span></td>
+                        <td style="color: var(--text-secondary);">${escapeHtml(course.department_name || 'N/A')}</td>
+                        <td style="color: var(--text-secondary);">${escapeHtml(course.specialty_name || 'General Course')}</td>
+                        <td><span class="badge" style="background-color: #F1F5F9; color: var(--text-main);">${escapeHtml(formatLevelLabel(course) || 'N/A')}</span></td>
                         <td>Sem ${course.semester}</td>
                         <td style="text-align: right;">
                             <div class="flex justify-end gap-2">
@@ -956,19 +1187,62 @@ function renderCoursesTable(courses) {
         </table>
         </div>
     `;
-    document.getElementById('coursesList').innerHTML = html;
+}
+
+function filterCourseDepartments(schoolId, departmentSelectId, specialtySelectId) {
+    const departmentSelect = document.getElementById(departmentSelectId);
+    const specialtySelect = document.getElementById(specialtySelectId);
+    if (!departmentSelect) return;
+
+    const departments = (window.allDepartments || []).filter((d) => !schoolId || String(d.school_id) === String(schoolId));
+    departmentSelect.innerHTML = `<option value="">Select Department</option>${departments.map((d) => `<option value="${d.id}">${d.name}</option>`).join('')}`;
+    if (specialtySelect) {
+        specialtySelect.innerHTML = '<option value="">Select Specialty</option>';
+    }
+}
+
+function toggleCourseSpecialtyField(scope, specialtySelectId) {
+    const specialtySelect = document.getElementById(specialtySelectId);
+    if (!specialtySelect) return;
+
+    if (scope === 'specialty') {
+        specialtySelect.disabled = false;
+        specialtySelect.required = true;
+    } else {
+        specialtySelect.disabled = true;
+        specialtySelect.required = false;
+        specialtySelect.value = '';
+    }
+}
+
+function filterCourseSpecialties(departmentId, specialtySelectId) {
+    const specialtySelect = document.getElementById(specialtySelectId);
+    if (!specialtySelect) return;
+
+    const specialties = (window.allSpecialties || []).filter((s) => !departmentId || String(s.department_id) === String(departmentId));
+    specialtySelect.innerHTML = `<option value="">Select Specialty</option>${specialties.map((s) => `<option value="${s.id}">${s.name}</option>`).join('')}`;
 }
 
 async function openModalCourseCreate() {
-    const [deptResponse, levelResponse] = await Promise.all([
+    const [schoolResponse, deptResponse, specialtyResponse, levelResponse] = await Promise.all([
+        fetch(`${API_URL}/schools`, { headers: getAuthHeaders() }),
         fetch(`${API_URL}/departments`, { headers: getAuthHeaders() }),
+        fetch(`${API_URL}/specialties`, { headers: getAuthHeaders() }),
         fetch(`${API_URL}/dashboard/levels`, { headers: getAuthHeaders() })
     ]);
     
+    const schoolData = await schoolResponse.json();
     const deptData = await deptResponse.json();
+    const specialtyData = await specialtyResponse.json();
     const levelData = await levelResponse.json();
+
+    window.allSchools = schoolData.data || [];
+    window.allDepartments = deptData.data || [];
+    window.allSpecialties = specialtyData.data || [];
     
+    const schoolOptions = schoolData.data.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
     const deptOptions = deptData.data.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    const specialtyOptions = specialtyData.data.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
     const levelOptions = levelData.data.map(l => `<option value="${l.id}">${formatLevelLabel(l)}</option>`).join('');
     
     const content = `
@@ -1004,12 +1278,37 @@ async function openModalCourseCreate() {
                 </div>
                 <div class="form-row">
                     <div class="form-group">
+                        <label>School *</label>
+                        <select id="courseSchool" class="input-field" required onchange="filterCourseDepartments(this.value, 'courseDept', 'courseSpecialty')" style="padding-left: 1rem; appearance: auto;">
+                            <option value="">Select School</option>
+                            ${schoolOptions}
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Department *</label>
-                        <select id="courseDept" class="input-field" required style="padding-left: 1rem; appearance: auto;">
+                        <select id="courseDept" class="input-field" required onchange="filterCourseSpecialties(this.value, 'courseSpecialty')" style="padding-left: 1rem; appearance: auto;">
                             <option value="">Select Department</option>
                             ${deptOptions}
                         </select>
                     </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Course Scope *</label>
+                        <select id="courseScope" class="input-field" required onchange="toggleCourseSpecialtyField(this.value, 'courseSpecialty')" style="padding-left: 1rem; appearance: auto;">
+                            <option value="general">General Course (department-wide)</option>
+                            <option value="specialty">Specialty Course</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Specialty</label>
+                        <select id="courseSpecialty" class="input-field" disabled style="padding-left: 1rem; appearance: auto;">
+                            <option value="">Select Specialty</option>
+                            ${specialtyOptions}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
                     <div class="form-group">
                         <label>Level *</label>
                         <select id="courseLevel" class="input-field" required style="padding-left: 1rem; appearance: auto;">
@@ -1028,16 +1327,19 @@ async function openModalCourseCreate() {
     `;
     createModal('courseModal', 'Create New Course', content);
     openModal('courseModal');
+    focusFirstField('courseCode');
 }
 
 async function saveCourse(event) {
     event.preventDefault();
+    const courseScope = document.getElementById('courseScope').value;
     const courseData = {
         course_code: document.getElementById('courseCode').value,
         course_name: document.getElementById('courseName').value,
         credits: parseInt(document.getElementById('courseCredits').value),
         semester: parseInt(document.getElementById('courseSemester').value),
         department_id: document.getElementById('courseDept').value,
+        specialty_id: courseScope === 'specialty' ? document.getElementById('courseSpecialty').value : null,
         level_id: document.getElementById('courseLevel').value
     };
     
@@ -1069,15 +1371,28 @@ async function editCourse(id) {
         const courseData = await courseRes.json();
         const course = courseData.data;
         
-        const [deptResponse, levelResponse] = await Promise.all([
+        const [schoolResponse, deptResponse, specialtyResponse, levelResponse] = await Promise.all([
+            fetch(`${API_URL}/schools`, { headers: getAuthHeaders() }),
             fetch(`${API_URL}/departments`, { headers: getAuthHeaders() }),
+            fetch(`${API_URL}/specialties`, { headers: getAuthHeaders() }),
             fetch(`${API_URL}/dashboard/levels`, { headers: getAuthHeaders() })
         ]);
         
+        const schoolData = await schoolResponse.json();
         const deptData = await deptResponse.json();
+        const specialtyData = await specialtyResponse.json();
         const levelData = await levelResponse.json();
-        
-        const deptOptions = deptData.data.map(d => `<option value="${d.id}" ${d.id === course.department_id ? 'selected' : ''}>${d.name}</option>`).join('');
+
+        window.allSchools = schoolData.data || [];
+        window.allDepartments = deptData.data || [];
+        window.allSpecialties = specialtyData.data || [];
+
+        const selectedDepartment = (deptData.data || []).find((d) => String(d.id) === String(course.department_id));
+        const selectedSchoolId = selectedDepartment ? selectedDepartment.school_id : '';
+        const selectedCourseScope = course.specialty_id ? 'specialty' : 'general';
+        const deptOptions = (deptData.data || []).map(d => `<option value="${d.id}" ${String(d.id) === String(course.department_id) ? 'selected' : ''}>${d.name}</option>`).join('');
+        const schoolOptions = (schoolData.data || []).map(s => `<option value="${s.id}" ${String(s.id) === String(selectedSchoolId) ? 'selected' : ''}>${s.name}</option>`).join('');
+        const specialtyOptions = (specialtyData.data || []).filter((s) => !course.department_id || String(s.department_id) === String(course.department_id)).map(s => `<option value="${s.id}" ${String(s.id) === String(course.specialty_id) ? 'selected' : ''}>${s.name}</option>`).join('');
         const levelOptions = levelData.data.map(l => `<option value="${l.id}" ${l.id === course.level_id ? 'selected' : ''}>${formatLevelLabel(l)}</option>`).join('');
         
         const content = `
@@ -1112,11 +1427,37 @@ async function editCourse(id) {
                     </div>
                     <div class="form-row">
                         <div class="form-group">
+                            <label>School *</label>
+                            <select id="editCourseSchool" class="input-field" required onchange="filterCourseDepartments(this.value, 'editCourseDept', 'editCourseSpecialty')" style="padding-left: 1rem; appearance: auto;">
+                                <option value="">Select School</option>
+                                ${schoolOptions}
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label>Department *</label>
-                            <select id="editCourseDept" class="input-field" required style="padding-left: 1rem; appearance: auto;">
+                            <select id="editCourseDept" class="input-field" required onchange="filterCourseSpecialties(this.value, 'editCourseSpecialty')" style="padding-left: 1rem; appearance: auto;">
+                                <option value="">Select Department</option>
                                 ${deptOptions}
                             </select>
                         </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Course Scope *</label>
+                            <select id="editCourseScope" class="input-field" required onchange="toggleCourseSpecialtyField(this.value, 'editCourseSpecialty')" style="padding-left: 1rem; appearance: auto;">
+                                <option value="general" ${selectedCourseScope === 'general' ? 'selected' : ''}>General Course (department-wide)</option>
+                                <option value="specialty" ${selectedCourseScope === 'specialty' ? 'selected' : ''}>Specialty Course</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Specialty</label>
+                            <select id="editCourseSpecialty" class="input-field" ${selectedCourseScope === 'specialty' ? '' : 'disabled'} style="padding-left: 1rem; appearance: auto;">
+                                <option value="">Select Specialty</option>
+                                ${specialtyOptions}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
                         <div class="form-group">
                             <label>Level *</label>
                             <select id="editCourseLevel" class="input-field" required style="padding-left: 1rem; appearance: auto;">
@@ -1141,12 +1482,14 @@ async function editCourse(id) {
 
 async function updateCourse(event, id) {
     event.preventDefault();
+    const courseScope = document.getElementById('editCourseScope').value;
     const courseData = {
         course_code: document.getElementById('editCourseCode').value,
         course_name: document.getElementById('editCourseName').value,
         credits: parseInt(document.getElementById('editCourseCredits').value),
         semester: parseInt(document.getElementById('editCourseSemester').value),
         department_id: document.getElementById('editCourseDept').value,
+        specialty_id: courseScope === 'specialty' ? document.getElementById('editCourseSpecialty').value : null,
         level_id: document.getElementById('editCourseLevel').value
     };
     
@@ -1239,7 +1582,23 @@ async function loadLecturers() {
 }
 
 function renderLecturersTable(lecturers) {
-    const html = `
+    const shell = setupSearchableList('lecturersList', 'Search lecturers by name, employee ID, department, or email');
+    if (!shell) return;
+
+    const { listBody, countLabel, searchInput } = shell;
+    if (countLabel) {
+        countLabel.textContent = `${lecturers.length} record${lecturers.length === 1 ? '' : 's'}`;
+    }
+    if (searchInput && searchInput.value) {
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
+
+    if (!lecturers.length) {
+        listBody.innerHTML = '<div class="card" style="padding: 24px; text-align:center; color:var(--text-secondary);">No lecturers match your search.</div>';
+        return;
+    }
+
+    listBody.innerHTML = `
         <div class="table-responsive">
             <table class="data-table">
                 <thead>
@@ -1254,10 +1613,10 @@ function renderLecturersTable(lecturers) {
                 <tbody>
                     ${lecturers.map(lecturer => `
                         <tr>
-                            <td style="font-weight: 600;">${lecturer.full_name || lecturer.user_name || 'N/A'}</td>
-                            <td><span class="badge" style="background-color: #F1F5F9; color: var(--text-main);">${lecturer.employee_id || lecturer.lecture_id || 'N/A'}</span></td>
-                            <td>${lecturer.department_name || 'N/A'}</td>
-                            <td style="color: var(--text-secondary);">${lecturer.email || 'N/A'}</td>
+                            <td style="font-weight: 600;">${escapeHtml(lecturer.full_name || lecturer.user_name || 'N/A')}</td>
+                            <td><span class="badge" style="background-color: #F1F5F9; color: var(--text-main);">${escapeHtml(lecturer.employee_id || lecturer.lecture_id || 'N/A')}</span></td>
+                            <td>${escapeHtml(lecturer.department_name || 'N/A')}</td>
+                            <td style="color: var(--text-secondary);">${escapeHtml(lecturer.email || 'N/A')}</td>
                             <td style="text-align: right;">
                                 <div class="flex justify-end gap-2">
                                     <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="editLecturer(${lecturer.id})">
@@ -1274,7 +1633,8 @@ function renderLecturersTable(lecturers) {
             </table>
         </div>
     `;
-    document.getElementById('lecturersList').innerHTML = html;
+
+    attachSearchToTable('lecturersList', window.allLecturers || [], renderLecturersTable, ['full_name', 'employee_id', 'department_name', 'email', 'user_name'], 'Search lecturers by name, employee ID, department, or email');
 }
 
 async function openModalLecturerCreate() {
@@ -1517,7 +1877,23 @@ async function loadRooms() {
 }
 
 function renderRoomsTable(rooms) {
-    const html = `
+    const shell = setupSearchableList('roomsList', 'Search rooms by number, building, capacity, or type');
+    if (!shell) return;
+
+    const { listBody, countLabel, searchInput } = shell;
+    if (countLabel) {
+        countLabel.textContent = `${rooms.length} record${rooms.length === 1 ? '' : 's'}`;
+    }
+    if (searchInput && searchInput.value) {
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
+
+    if (!rooms.length) {
+        listBody.innerHTML = '<div class="card" style="padding: 24px; text-align:center; color:var(--text-secondary);">No rooms match your search.</div>';
+        return;
+    }
+
+    listBody.innerHTML = `
         <div class="table-responsive">
             <table class="data-table">
                 <thead>
@@ -1532,10 +1908,10 @@ function renderRoomsTable(rooms) {
                 <tbody>
                     ${rooms.map(room => `
                         <tr>
-                            <td style="font-weight: 600;">${room.room_number || 'N/A'}</td>
-                            <td>${room.building || 'N/A'}</td>
-                            <td><span class="badge" style="background-color: #F1F5F9; color: var(--text-main);">${room.capacity || room.room_capacity || '0'}</span></td>
-                            <td>${room.type || 'N/A'}</td>
+                            <td style="font-weight: 600;">${escapeHtml(room.room_number || 'N/A')}</td>
+                            <td>${escapeHtml(room.building || 'N/A')}</td>
+                            <td><span class="badge" style="background-color: #F1F5F9; color: var(--text-main);">${escapeHtml(room.capacity || room.room_capacity || '0')}</span></td>
+                            <td>${escapeHtml(room.type || 'N/A')}</td>
                             <td style="text-align: right;">
                                 <div class="flex justify-end gap-2">
                                     <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="editRoom(${room.id})">
@@ -1552,7 +1928,8 @@ function renderRoomsTable(rooms) {
             </table>
         </div>
     `;
-    document.getElementById('roomsList').innerHTML = html;
+
+    attachSearchToTable('roomsList', window.allRooms || [], renderRoomsTable, ['room_number', 'building', 'capacity', 'type', 'room_capacity'], 'Search rooms by number, building, capacity, or type');
 }
 
 
@@ -1776,43 +2153,67 @@ async function loadLevels() {
         const data = await response.json();
         
         if (data.success) {
-            const html = `
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Level Number</th>
-                            <th>Description</th>
-                            <th style="text-align: right;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.data.map(lvl => {
-                            const safeDescription = JSON.stringify(lvl.description || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-                            return `
-                            <tr>
-                                <td style="font-weight: 700; font-size: 1.1rem; color: var(--primary);">${formatLevelLabel(lvl)}</td>
-                                <td>${lvl.description || `Year ${Math.floor(lvl.level_number / 100)} Undergraduate Level`}</td>
-                                <td style="text-align: right;">
-                                    <div class="flex justify-end gap-2">
-                                        <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="editLevel(${lvl.id}, ${lvl.level_number}, ${safeDescription})">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn btn-outline btn-sm" style="color: var(--error);" onclick="deleteLevel(${lvl.id})">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            `;
-            document.getElementById('levelsList').innerHTML = html;
+            window.allLevels = data.data || [];
+            renderLevelsTable(window.allLevels);
         }
     } catch (error) {
         document.getElementById('levelsList').innerHTML = `<p class="error">Error loading levels</p>`;
     }
+}
+
+function renderLevelsTable(levels) {
+    const shell = setupSearchableList('levelsList', 'Search levels by number or description');
+    if (!shell) return;
+
+    const { listBody, countLabel, searchInput } = shell;
+    if (countLabel) {
+        countLabel.textContent = `${levels.length} record${levels.length === 1 ? '' : 's'}`;
+    }
+    if (searchInput && searchInput.value) {
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
+
+    if (!levels.length) {
+        listBody.innerHTML = '<div class="card" style="padding: 24px; text-align:center; color:var(--text-secondary);">No levels match your search.</div>';
+        return;
+    }
+
+    listBody.innerHTML = `
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Level Number</th>
+                        <th>Description</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${levels.map(lvl => {
+                        const safeDescription = JSON.stringify(lvl.description || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                        return `
+                        <tr>
+                            <td style="font-weight: 700; font-size: 1.1rem; color: var(--primary);">${escapeHtml(formatLevelLabel(lvl))}</td>
+                            <td>${escapeHtml(lvl.description || `Year ${Math.floor(lvl.level_number / 100)} Undergraduate Level`)}</td>
+                            <td style="text-align: right;">
+                                <div class="flex justify-end gap-2">
+                                    <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="editLevel(${lvl.id}, ${lvl.level_number}, ${safeDescription})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-outline btn-sm" style="color: var(--error);" onclick="deleteLevel(${lvl.id})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    attachSearchToTable('levelsList', window.allLevels || [], renderLevelsTable, ['level_number', 'description', 'name'], 'Search levels by number or description');
 }
 
 function openModalLevelCreate() {
@@ -2144,7 +2545,21 @@ async function loadUserManagement() {
 
 
 function renderUsersTable(users) {
-    const html = `
+    window.currentUsersView = users;
+    const shell = setupSearchableList('usersList', 'Search users by name, email, or role');
+    if (!shell) return;
+
+    const { listBody, countLabel } = shell;
+    if (countLabel) {
+        countLabel.textContent = `${users.length} record${users.length === 1 ? '' : 's'}`;
+    }
+
+    if (!users.length) {
+        listBody.innerHTML = '<div class="card" style="padding: 24px; text-align:center; color:var(--text-secondary);">No users match your search.</div>';
+        return;
+    }
+
+    listBody.innerHTML = `
         <div class="table-responsive">
             <table class="data-table">
                 <thead>
@@ -2159,13 +2574,13 @@ function renderUsersTable(users) {
                 <tbody>
                     ${users.map(user => `
                         <tr>
-                            <td style="font-weight: 600;">${user.full_name || 'N/A'}</td>
-                            <td>${user.email || 'N/A'}</td>
-                            <td><span class="badge" style="text-transform: capitalize;">${user.role || user.user_role || 'N/A'}</span></td>
-                            <td style="color: var(--text-secondary); font-size: 0.8rem;">${user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</td>
+                            <td style="font-weight: 600;">${escapeHtml(user.full_name || 'N/A')}</td>
+                            <td>${escapeHtml(user.email || 'N/A')}</td>
+                            <td><span class="badge" style="text-transform: capitalize;">${escapeHtml(user.role || user.user_role || 'N/A')}</span></td>
+                            <td style="color: var(--text-secondary); font-size: 0.8rem;">${escapeHtml(user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A')}</td>
                             <td style="text-align: right;">
                                 <div class="flex justify-end gap-2">
-                                    <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="openModalUserEdit(${user.id}, '${user.full_name}', '${user.email}', '${user.role}')">
+                                    <button class="btn btn-outline btn-sm" style="color: var(--primary);" onclick="openModalUserEdit(${user.id}, '${escapeHtml(user.full_name || '')}', '${escapeHtml(user.email || '')}', '${escapeHtml(user.role || '')}')">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-outline btn-sm" style="color: var(--error);" onclick="deleteUser(${user.id})">
@@ -2179,8 +2594,8 @@ function renderUsersTable(users) {
             </table>
         </div>
     `;
-    const list = document.getElementById('usersList');
-    if (list) list.innerHTML = html;
+
+    attachSearchToTable('usersList', window.currentUsersView || [], renderUsersTable, ['full_name', 'email', 'role', 'created_at'], 'Search users by name, email, or role');
 }
 
 function openModalUserEdit(id, name, email, role) {
@@ -2310,6 +2725,38 @@ async function loadTimetableManagement() {
 
         <div class="card">
             <div class="flex flex-col gap-6">
+                <div class="flex flex-wrap gap-3" style="margin-bottom: 0.75rem;">
+                    <div class="form-group" style="min-width: 180px; flex: 1;">
+                        <label style="font-size: 0.8rem; margin-bottom: 0.35rem; display: block;">School</label>
+                        <select id="filterSchool" class="input-field" style="padding-left: 1rem; appearance: auto;">
+                            <option value="">All Schools</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="min-width: 180px; flex: 1;">
+                        <label style="font-size: 0.8rem; margin-bottom: 0.35rem; display: block;">Department</label>
+                        <select id="filterDepartment" class="input-field" style="padding-left: 1rem; appearance: auto;">
+                            <option value="">All Departments</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="min-width: 180px; flex: 1;">
+                        <label style="font-size: 0.8rem; margin-bottom: 0.35rem; display: block;">Specialty</label>
+                        <select id="filterSpecialty" class="input-field" style="padding-left: 1rem; appearance: auto;">
+                            <option value="">All Specialties</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="min-width: 180px; flex: 1;">
+                        <label style="font-size: 0.8rem; margin-bottom: 0.35rem; display: block;">Lecturer</label>
+                        <select id="filterLecturer" class="input-field" style="padding-left: 1rem; appearance: auto;">
+                            <option value="">All Lecturers</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="min-width: 180px; flex: 1;">
+                        <label style="font-size: 0.8rem; margin-bottom: 0.35rem; display: block;">Level</label>
+                        <select id="filterLevel" class="input-field" style="padding-left: 1rem; appearance: auto;">
+                            <option value="">All Levels</option>
+                        </select>
+                    </div>
+                </div>
                 <div id="timetableList" style="overflow-x: auto;">
                     <div style="display: flex; align-items: center; justify-content: center; height: 200px;">
                         <div class="spinner"></div>
@@ -2320,14 +2767,31 @@ async function loadTimetableManagement() {
     `;
     
     try {
-        const [response, deptRes, lecRes, levelRes] = await Promise.all([
+        const [response, deptRes, lecRes, levelRes, schoolRes, specialtyRes] = await Promise.all([
             fetch(`${API_URL}/timetable`, { headers: getAuthHeaders() }),
             fetch(`${API_URL}/departments`, { headers: getAuthHeaders() }),
             fetch(`${API_URL}/lecturers`, { headers: getAuthHeaders() }),
-            fetch(`${API_URL}/dashboard/levels`, { headers: getAuthHeaders() })
+            fetch(`${API_URL}/dashboard/levels`, { headers: getAuthHeaders() }),
+            fetch(`${API_URL}/schools`, { headers: getAuthHeaders() }),
+            fetch(`${API_URL}/specialties`, { headers: getAuthHeaders() })
         ]);
-        const [data, deptData, lecData, levelData] = await Promise.all([response.json(), deptRes.json(), lecRes.json(), levelRes.json()]);
-        populateTimetableFilters(deptData.data || [], lecData.data || [], levelData.data || []);
+        const [data, deptData, lecData, levelData, schoolData, specialtyData] = await Promise.all([
+            response.json(),
+            deptRes.json(),
+            lecRes.json(),
+            levelRes.json(),
+            schoolRes.json(),
+            specialtyRes.json()
+        ]);
+        window.allLecturers = lecData.data || [];
+        window.allLevels = levelData.data || [];
+        populateTimetableFilters(
+            deptData.data || [],
+            lecData.data || [],
+            levelData.data || [],
+            schoolData.data || [],
+            specialtyData.data || []
+        );
         
         if (data.success) {
             window.allTimetableEntries = data.data;
@@ -2340,27 +2804,156 @@ async function loadTimetableManagement() {
     }
 }
 
-function populateTimetableFilters(departments, lecturers, levels) {
+function populateTimetableFilters(departments, lecturers, levels, schools = [], specialties = []) {
+    window.allTimetableDepartments = departments;
+    window.allTimetableSchools = schools;
+    window.allTimetableSpecialties = specialties;
+
+    const schoolSelect = document.getElementById('filterSchool');
     const deptSelect = document.getElementById('filterDepartment');
+    const specialtySelect = document.getElementById('filterSpecialty');
     const lecturerSelect = document.getElementById('filterLecturer');
     const levelSelect = document.getElementById('filterLevel');
-    if (!deptSelect || !lecturerSelect || !levelSelect) return;
+    if (!schoolSelect || !deptSelect || !specialtySelect || !lecturerSelect || !levelSelect) return;
 
-    deptSelect.innerHTML = `<option value="">All Departments</option>${departments.map((d) => `<option value="${d.id}">${d.name}</option>`).join('')}`;
-    lecturerSelect.innerHTML = `<option value="">All Lecturers</option>${lecturers.map((l) => `<option value="${l.id}">${l.full_name || l.user_name || 'Unknown'}</option>`).join('')}`;
-    levelSelect.innerHTML = `<option value="">All Levels</option>${levels.map((l) => `<option value="${l.level_number}">${l.level_number}</option>`).join('')}`;
+    const selectedSchoolId = schoolSelect.value || '';
+    const selectedDeptId = deptSelect.value || '';
+    const selectedSpecialtyId = specialtySelect.value || '';
+    const selectedLecturerId = lecturerSelect.value || '';
+    const selectedLevelNumber = levelSelect.value || '';
+
+    const filteredDepartments = !selectedSchoolId
+        ? departments
+        : departments.filter((d) => String(d.school_id) === String(selectedSchoolId));
+
+    const departmentsForCurrentSelection = filteredDepartments.some((d) => String(d.id) === String(selectedDeptId))
+        ? filteredDepartments
+        : filteredDepartments;
+
+    const validDeptId = departmentsForCurrentSelection.some((d) => String(d.id) === String(selectedDeptId))
+        ? selectedDeptId
+        : '';
+
+    const filteredSpecialties = !validDeptId
+        ? specialties.filter((s) => !selectedSchoolId || String(s.school_id) === String(selectedSchoolId))
+        : specialties.filter((s) => String(s.department_id) === String(validDeptId) && (!selectedSchoolId || String(s.school_id) === String(selectedSchoolId)));
+
+    const validSpecialtyId = filteredSpecialties.some((s) => String(s.id) === String(selectedSpecialtyId))
+        ? selectedSpecialtyId
+        : '';
+
+    schoolSelect.innerHTML = `<option value="">All Schools</option>${schools.map((s) => `<option value="${s.id}" ${selectedSchoolId === String(s.id) ? 'selected' : ''}>${s.name}</option>`).join('')}`;
+    deptSelect.innerHTML = `<option value="">All Departments</option>${filteredDepartments.map((d) => `<option value="${d.id}" ${validDeptId === String(d.id) ? 'selected' : ''}>${d.name}</option>`).join('')}`;
+    specialtySelect.innerHTML = `<option value="">All Specialties</option>${filteredSpecialties.map((s) => `<option value="${s.id}" ${validSpecialtyId === String(s.id) ? 'selected' : ''}>${s.name}</option>`).join('')}`;
+
+    const filteredEntriesForLecturers = applyTimetableFilters(window.allTimetableEntries || [], {
+        ignoreLevel: true,
+        schoolId: selectedSchoolId,
+        deptId: validDeptId,
+        specialtyId: validSpecialtyId,
+        lecturerId: selectedLecturerId,
+        levelNumber: ''
+    });
+
+    const lecturerOptions = [...new Set(filteredEntriesForLecturers.map((entry) => entry.lecturer_id).filter(Boolean))];
+    const validLecturerId = lecturerOptions.includes(Number(selectedLecturerId)) || lecturerOptions.includes(String(selectedLecturerId))
+        ? selectedLecturerId
+        : '';
+
+    lecturerSelect.innerHTML = `<option value="">All Lecturers</option>${lecturers.filter((l) => !validLecturerId || String(l.id) === String(validLecturerId)).map((l) => `<option value="${l.id}" ${validLecturerId === String(l.id) ? 'selected' : ''}>${l.full_name || l.user_name || 'Unknown'}</option>`).join('')}`;
+
+    const filteredEntriesForLevels = applyTimetableFilters(window.allTimetableEntries || [], {
+        schoolId: selectedSchoolId,
+        deptId: validDeptId,
+        specialtyId: validSpecialtyId,
+        lecturerId: validLecturerId,
+        levelNumber: ''
+    });
+
+    const availableLevels = [...new Set(filteredEntriesForLevels.map((entry) => entry.level_number).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
+    const validLevelNumber = availableLevels.includes(String(selectedLevelNumber)) || availableLevels.includes(Number(selectedLevelNumber))
+        ? selectedLevelNumber
+        : '';
+
+    levelSelect.innerHTML = `<option value="">All Levels</option>${availableLevels.map((level) => `<option value="${level}" ${validLevelNumber === String(level) ? 'selected' : ''}>${level}</option>`).join('')}`;
+
+    [schoolSelect, deptSelect, specialtySelect, lecturerSelect, levelSelect].forEach((select) => {
+        if (select) {
+            select.onchange = () => {
+                populateTimetableFilters(
+                    window.allTimetableDepartments || [],
+                    window.allLecturers || [],
+                    window.allLevels || [],
+                    window.allTimetableSchools || [],
+                    window.allTimetableSpecialties || []
+                );
+                const filtered = applyTimetableFilters(window.allTimetableEntries || []);
+                renderTimetableTable(filtered);
+            };
+        }
+    });
 }
 
-function applyTimetableFilters(timetable) {
-    const deptId = document.getElementById('filterDepartment')?.value || '';
-    const lecturerId = document.getElementById('filterLecturer')?.value || '';
-    const levelNumber = document.getElementById('filterLevel')?.value || '';
+function getTimetableEntryDepartment(entry) {
+    if (entry.department_id != null && entry.department_id !== '') return entry.department_id;
+    const department = (window.allTimetableDepartments || []).find((d) => String(d.id) === String(entry.department_id));
+    return department ? department.id : null;
+}
+
+function getTimetableEntrySchool(entry) {
+    if (entry.school_id != null && entry.school_id !== '') return entry.school_id;
+    if (entry.department_id != null && entry.department_id !== '') {
+        const department = (window.allTimetableDepartments || []).find((d) => String(d.id) === String(entry.department_id));
+        return department ? department.school_id : null;
+    }
+    const department = (window.allTimetableDepartments || []).find((d) => String(d.id) === String(entry.department_id));
+    return department ? department.school_id : null;
+}
+
+function getTimetableEntrySpecialty(entry) {
+    const courseSpecialtyId = entry.course_specialty_id ?? entry.specialty_id;
+    if (courseSpecialtyId != null && courseSpecialtyId !== '') return courseSpecialtyId;
+    if (entry.specialty_name || entry.course_specialty_name) return entry.specialty_name || entry.course_specialty_name;
+    return null;
+}
+
+function applyTimetableFilters(timetable, overrides = {}) {
+    const schoolId = overrides.schoolId !== undefined ? overrides.schoolId : (document.getElementById('filterSchool')?.value || '');
+    const deptId = overrides.deptId !== undefined ? overrides.deptId : (document.getElementById('filterDepartment')?.value || '');
+    const specialtyId = overrides.specialtyId !== undefined ? overrides.specialtyId : (document.getElementById('filterSpecialty')?.value || '');
+    const lecturerId = overrides.lecturerId !== undefined ? overrides.lecturerId : (document.getElementById('filterLecturer')?.value || '');
+    const levelNumber = overrides.levelNumber !== undefined ? overrides.levelNumber : (document.getElementById('filterLevel')?.value || '');
+
+    const selectedSpecialty = (window.allTimetableSpecialties || []).find((s) => String(s.id) === String(specialtyId));
+    const specialtyDepartmentId = selectedSpecialty?.department_id || '';
+    const specialtySchoolId = selectedSpecialty?.school_id || '';
+    const specialtyName = selectedSpecialty?.name || '';
+    const specialtyCode = selectedSpecialty?.code || '';
 
     return timetable.filter((entry) => {
-        const departmentOk = !deptId || String(entry.department_id) === String(deptId);
+        const entrySchoolId = getTimetableEntrySchool(entry);
+        const entryDepartmentId = getTimetableEntryDepartment(entry);
+        const entrySpecialtyId = getTimetableEntrySpecialty(entry);
+        const entrySpecialtyName = entry.specialty_name || entry.course_specialty_name || '';
+        const schoolOk = !schoolId || String(entrySchoolId) === String(schoolId);
+        const departmentOk = !deptId || String(entryDepartmentId) === String(deptId);
+        const matchesSpecialtyDirectly = Boolean(
+            specialtyId && (
+                (entrySpecialtyId != null && entrySpecialtyId !== '' && String(entrySpecialtyId) === String(specialtyId)) ||
+                (entrySpecialtyName && specialtyName && String(entrySpecialtyName).toLowerCase() === String(specialtyName).toLowerCase()) ||
+                (entrySpecialtyName && specialtyCode && String(entrySpecialtyName).toLowerCase() === String(specialtyCode).toLowerCase())
+            )
+        );
+        const matchesSpecialtyContext = Boolean(
+            specialtyDepartmentId &&
+            entryDepartmentId &&
+            String(entryDepartmentId) === String(specialtyDepartmentId) &&
+            (!specialtySchoolId || !entrySchoolId || String(entrySchoolId) === String(specialtySchoolId))
+        );
+        const specialtyOk = !specialtyId || matchesSpecialtyDirectly || matchesSpecialtyContext;
         const lecturerOk = !lecturerId || String(entry.lecturer_id) === String(lecturerId);
-        const levelOk = !levelNumber || String(entry.level_number) === String(levelNumber);
-        return departmentOk && lecturerOk && levelOk;
+        const levelOk = overrides.ignoreLevel || !levelNumber || String(entry.level_number) === String(levelNumber);
+        return schoolOk && departmentOk && specialtyOk && lecturerOk && levelOk;
     });
 }
 
@@ -2500,7 +3093,21 @@ async function downloadAdminTimetablePDF() {
 }
 
 function renderTimetableTable(timetable) {
-    const html = `
+    window.currentTimetableView = timetable;
+    const shell = setupSearchableList('timetableList', 'Search timetable by course, lecturer, room, or day');
+    if (!shell) return;
+
+    const { listBody, countLabel } = shell;
+    if (countLabel) {
+        countLabel.textContent = `${timetable.length} record${timetable.length === 1 ? '' : 's'}`;
+    }
+
+    if (!timetable.length) {
+        listBody.innerHTML = '<div class="card" style="padding: 24px; text-align:center; color:var(--text-secondary);">No timetable entries match your search.</div>';
+        return;
+    }
+
+    listBody.innerHTML = `
         <div class="table-responsive">
             <table class="data-table">
             <thead>
@@ -2518,15 +3125,15 @@ function renderTimetableTable(timetable) {
             <tbody>
                 ${timetable.map(entry => `
                     <tr>
-                        <td><span class="badge">${entry.course_code}</span></td>
-                        <td><strong>${entry.course_name}</strong></td>
-                        <td>${entry.lecturer_name || 'N/A'}</td>
-                        <td><span class="entry-chip">${entry.room_number}</span></td>
-                        <td><span class="entry-chip">${entry.level_number}</span></td>
-                        <td><span class="entry-chip">${entry.day_of_week}</span></td>
-                        <td>${entry.start_time} - ${entry.end_time}</td>
+                        <td><span class="badge">${escapeHtml(entry.course_code || '')}</span></td>
+                        <td><strong>${escapeHtml(entry.course_name || '')}</strong></td>
+                        <td>${escapeHtml(entry.lecturer_name || 'N/A')}</td>
+                        <td><span class="entry-chip">${escapeHtml(entry.room_number || '')}</span></td>
+                        <td><span class="entry-chip">${escapeHtml(entry.level_number || '')}</span></td>
+                        <td><span class="entry-chip">${escapeHtml(entry.day_of_week || '')}</span></td>
+                        <td>${escapeHtml(entry.start_time || '')} - ${escapeHtml(entry.end_time || '')}</td>
                         <td class="actions">
-                            <button class="btn-sm btn-primary" onclick="openModalTimetableEdit(${entry.id}, ${entry.course_id}, ${entry.lecturer_id}, ${entry.room_id}, ${entry.level_id}, ${entry.time_slot_id}, '${entry.academic_year}', ${entry.semester})">Edit</button>
+                            <button class="btn-sm btn-primary" onclick="openModalTimetableEdit(${entry.id}, ${entry.course_id}, ${entry.lecturer_id}, ${entry.room_id}, ${entry.level_id}, ${entry.time_slot_id}, '${escapeHtml(entry.academic_year || '')}', ${entry.semester})">Edit</button>
                             <button class="btn-sm btn-danger" onclick="deleteTimetableEntry(${entry.id})">Delete</button>
                         </td>
                     </tr>
@@ -2535,7 +3142,8 @@ function renderTimetableTable(timetable) {
         </table>
         </div>
     `;
-    document.getElementById('timetableList').innerHTML = html;
+
+    attachSearchToTable('timetableList', window.currentTimetableView || [], renderTimetableTable, ['course_code', 'course_name', 'lecturer_name', 'room_number', 'level_number', 'day_of_week', 'start_time', 'end_time'], 'Search timetable by course, lecturer, room, or day');
 }
 
 async function openModalTimetableCreate() {

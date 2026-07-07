@@ -86,18 +86,36 @@ async function loadStudentTimetableView() {
     }
 }
 
-// Display Timetable in Grid Format
-function displayTimetable(entries, container) {
+// Display Timetable in Beautiful Template Format
+async function displayTimetable(entries, container) {
     if (!entries || entries.length === 0) {
         container.innerHTML = `
-            <div class="card" style="text-align: center; padding: var(--spacing-12);">
-                <i class="fas fa-calendar-times" style="font-size: 3rem; color: var(--text-muted); margin-bottom: var(--spacing-4);"></i>
-                <h3>No timetable entries found</h3>
-                <p style="color: var(--text-secondary);">Start by adding courses to the timetable.</p>
-                <button class="btn btn-primary" style="margin-top: var(--spacing-6);" onclick="showCreateTimetableModal()">+ Add Entry</button>
+            <div class="timetable-template-wrapper">
+                <div class="timetable-template-container">
+                    <div class="timetable-main-container" style="text-align: center; padding: var(--spacing-12);">
+                        <i class="fas fa-calendar-times" style="font-size: 3rem; color: var(--text-muted); margin-bottom: var(--spacing-4);"></i>
+                        <h3>No timetable entries found</h3>
+                        <p style="color: var(--text-secondary);">Start by adding courses to the timetable.</p>
+                        <button class="btn btn-primary" style="margin-top: var(--spacing-6);" onclick="showCreateTimetableModal()">+ Add Entry</button>
+                    </div>
+                </div>
             </div>
         `;
         return;
+    }
+    
+    // Get institution name
+    let institutionName = 'Landmark Metropolitan University';
+    try {
+        const schoolResponse = await fetch(`${API_URL}/schools`, {
+            headers: getAuthHeaders()
+        });
+        const schoolData = await schoolResponse.json();
+        if (schoolData.success && schoolData.data && schoolData.data.length > 0) {
+            institutionName = schoolData.data[0].name;
+        }
+    } catch (error) {
+        console.error('Error loading school info:', error);
     }
     
     // Group by day of week
@@ -115,190 +133,198 @@ function displayTimetable(entries, container) {
     const timeSlots = Array.from(new Set(entries.map(entry => `${entry.start_time} - ${entry.end_time}`)));
     timeSlots.sort((a, b) => parseTimeValue(a.split(' - ')[0]) - parseTimeValue(b.split(' - ')[0]));
 
+    // Extract unique levels/groups for reading groups panel
+    const uniqueLevels = [...new Set(entries.map(e => e.level_number || e.level || 'N/A'))].sort();
+    const readingGroupColors = {
+        'B': '#3B82F6', 'R': '#10B981', 'E': '#F59E0B', 'A': '#8B5CF6', 'K': '#EC4899'
+    };
+    
+    // Color mapping for courses
+    const colorClasses = ['course-color-1', 'course-color-2', 'course-color-3', 'course-color-4', 'course-color-5', 'course-color-6'];
+    
+    // Generate course cards HTML
+    const getCourseCardHTML = (entry, index) => {
+        const colorClass = colorClasses[index % colorClasses.length];
+        return `
+            <div class="timetable-course-card ${colorClass}" onclick="showEditTimetableModal(${entry.id})">
+                <div class="course-code-timetable">${entry.course_code}</div>
+                <div class="course-name-timetable">${entry.course_name || 'Course'}</div>
+                <div class="course-lecturer-timetable">${entry.lecturer_name || 'TBD'}</div>
+                <div class="course-room-timetable">${entry.room_number || 'Room TBD'}</div>
+            </div>
+        `;
+    };
+    
+    // Build grid HTML
+    let gridHTML = '<div class="timetable-grid-container">';
+    
+    // Header row
+    gridHTML += '<div class="timetable-cell timetable-time-header"></div>';
+    daysOfWeek.forEach(day => {
+        gridHTML += `<div class="timetable-cell timetable-day-header">${day.toUpperCase()}</div>`;
+    });
+    
+    // Time slot rows
+    let cardIndex = 0;
+    timeSlots.forEach(slot => {
+        gridHTML += `<div class="timetable-cell timetable-time-cell">${slot}</div>`;
+        daysOfWeek.forEach(day => {
+            const rowEntries = (timetableByDay[day] || []).filter(e => `${e.start_time} - ${e.end_time}` === slot);
+            if (rowEntries.length > 0) {
+                gridHTML += '<div class="timetable-cell timetable-filled-cell">';
+                rowEntries.forEach(entry => {
+                    gridHTML += getCourseCardHTML(entry, cardIndex++);
+                });
+                gridHTML += '</div>';
+            } else {
+                gridHTML += '<div class="timetable-cell timetable-empty-cell"></div>';
+            }
+        });
+    });
+    
+    gridHTML += '</div>';
+    
+    // Build reading groups HTML
+    let readingGroupHTML = '<ul class="reading-group-list">';
+    uniqueLevels.forEach((level, i) => {
+        const levelLetter = String.fromCharCode(66 + (i % 5)); // B, R, E, A, K
+        const levelColor = Object.values(readingGroupColors)[i % 5];
+        readingGroupHTML += `
+            <li class="reading-group-item" style="border-left-color: ${levelColor};">
+                <div class="reading-group-item-code">${levelLetter}</div>
+                <div class="reading-group-item-label">Level ${level}</div>
+            </li>
+        `;
+    });
+    readingGroupHTML += '</ul>';
+
+    const currentDate = new Date().toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    const currentTime = new Date().toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        hour12: true 
+    });
+
     container.innerHTML = `
-        <div class="page-header">
-            <div class="breadcrumb">
-                <span>ACADEMIC</span>
-                <span>RESOURCES</span>
-                <span>TIMETABLE MANAGEMENT</span>
-            </div>
-            <div class="flex justify-between items-center">
-                <div>
-                    <h1>Timetable Management</h1>
-                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Manage academic schedules and optimize room utilization.</p>
-                </div>
-                <div class="flex flex-col" style="align-items: flex-end; gap: 0.5rem;">
-                    <div class="flex gap-2" style="align-items: center;">
-                        <button class="btn btn-outline btn-sm" onclick="exportTimetableToPDF()">
-                            <i class="fas fa-file-pdf"></i> Download PDF
-                        </button>
-                        <button class="btn btn-outline btn-sm" onclick="printTimetable()">
-                            <i class="fas fa-print"></i> Print
-                        </button>
-                        <button class="btn btn-primary" onclick="showCreateTimetableModal()">
-                            <i class="fas fa-plus"></i> &nbsp; Add Entry
-                        </button>
+        <div class="timetable-template-wrapper">
+            <div class="timetable-template-container">
+                <!-- Header Section -->
+                <div class="timetable-header-section">
+                    <div class="timetable-logo-area">
+                        <div class="timetable-logo-icon">
+                            <i class="fas fa-university"></i>
+                        </div>
                     </div>
-                    <span style="font-size: 0.8rem; color: var(--text-muted);">One-click PDF download of the current timetable.</span>
+                    <div class="timetable-institution-name">${institutionName}</div>
                 </div>
-            </div>
-        </div>
-
-        <div class="card" style="margin-bottom: var(--spacing-6);">
-            <div class="flex justify-between items-center">
-                <div class="flex gap-4 items-center">
-                    <span style="font-weight: 700; font-size: 0.75rem; color: var(--text-muted);">FILTER BY:</span>
-                    <select id="filterSchool" class="input-field" style="width: 180px; padding: 0.5rem;">
-                        <option value="">All Schools</option>
-                    </select>
-                    <select id="filterDepartment" class="input-field" style="width: 180px; padding: 0.5rem;" onchange="filterTimetableByDepartment()">
-                        <option value="">All Departments</option>
-                    </select>
-                    <select id="filterLevel" class="input-field" style="width: 150px; padding: 0.5rem;" onchange="filterTimetableByLevel()">
-                        <option value="">All Levels</option>
-                    </select>
-                </div>
-                <div class="flex gap-2">
-                    <button class="btn btn-outline btn-sm" onclick="exportTimetableToPDF()"><i class="fas fa-file-pdf"></i></button>
-                    <button class="btn btn-outline btn-sm" onclick="printTimetable()"><i class="fas fa-print"></i></button>
-                </div>
-            </div>
-        </div>
-
-        <div class="dashboard-content-flex" style="display: flex; gap: var(--spacing-6); align-items: flex-start; flex-wrap: wrap;">
-            <!-- Timetable Grid -->
-            <div class="timetable-container" id="timetableExportable" style="flex: 1; min-width: 0; overflow-x: auto;">
-                <table class="timetable-table" aria-label="Weekly timetable">
-                    <thead>
-                        <tr>
-                            <th>Time</th>
-                            ${daysOfWeek.map(day => `<th>${day}</th>`).join('')}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${timeSlots.map(slot => `
-                            <tr>
-                                <td class="timetable-cell time-slot">${slot}</td>
-                                ${daysOfWeek.map(day => {
-                                    const rowEntries = (timetableByDay[day] || []).filter(e => `${e.start_time} - ${e.end_time}` === slot);
-                                    if (rowEntries.length) {
-                                        return `<td class="timetable-cell">${rowEntries.map(entry => {
-                                            const colors = [
-                                                { bg: '#EFF6FF', border: '#3B82F6', text: '#1E40AF' },
-                                                { bg: '#ECFDF5', border: '#10B981', text: '#065F46' },
-                                                { bg: '#FFFBEB', border: '#F59E0B', text: '#92400E' },
-                                                { bg: '#F5F3FF', border: '#8B5CF6', text: '#5B21B6' }
-                                            ];
-                                            const color = colors[entry.id % colors.length];
-                                            return `
-                                                <div class="course-card" style="background-color: ${color.bg}; border-left-color: ${color.border}; cursor: pointer; padding: 8px 10px;" onclick="showEditTimetableModal(${entry.id})">
-                                                    <span class="course-code" style="color: ${color.text}; font-weight: 600; display: block;">${entry.course_code}</span>
-                                                    <span class="course-info" style="font-size: 0.75rem; display: block; margin-top: 0.25rem;"><strong>Course:</strong> ${entry.course_name || ''}</span>
-                                                    <span class="course-info" style="font-size: 0.75rem; display: block;"><strong>Lecturer:</strong> ${entry.lecturer_name || 'N/A'}</span>
-                                                    <span class="course-info" style="font-size: 0.75rem; display: block;"><strong>Room:</strong> ${entry.room_number || 'Room TBD'}</span>
-                                                    <span class="course-info" style="font-size: 0.75rem; display: block;"><strong>Level:</strong> ${entry.level_number || entry.level || 'N/A'}</span>
-                                                    <span class="course-info" style="font-size: 0.75rem; display: block;"><strong>Time:</strong> ${entry.start_time || ''}${entry.end_time ? ' - ' + entry.end_time : ''}</span>
-                                                </div>
-                                            `;
-                                        }).join('')}</td>`;
-                                    }
-                                    return '<td class="timetable-cell"></td>';
-                                }).join('')}
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Side Panel -->
-            <aside class="optimizer-panel">
-                <div class="optimizer-card">
-                    <div class="optimizer-header">
-                        <i class="fas fa-bolt"></i>
-                        <span>AI Optimizer</span>
+                
+                <!-- Main Container -->
+                <div class="timetable-main-container">
+                    <!-- Title Banner -->
+                    <div class="timetable-title-banner">
+                        <div class="timetable-title-text">
+                            <h1>TIMETABLE</h1>
+                            <div class="timetable-subtitle">Academic Schedule</div>
+                        </div>
+                        <div class="timetable-meta-info">
+                            <div>📅 ${currentDate}</div>
+                            <div>🕐 ${currentTime}</div>
+                        </div>
                     </div>
                     
-                    <!-- Example Conflict -->
-                    <div class="conflict-alert">
-                        <div class="flex gap-2" style="margin-bottom: 8px;">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <span style="font-size: 0.75rem; font-weight: 800; color: #991B1B;">CONFLICT DETECTED</span>
+                    <!-- Controls Bar -->
+                    <div class="timetable-controls-bar">
+                        <div class="timetable-filter-group">
+                            <span class="timetable-filter-label">Filter By:</span>
+                            <select id="filterLevel" class="timetable-filter-select" onchange="filterTimetableByLevel()">
+                                <option value="">All Levels</option>
+                            </select>
+                            <select id="filterDepartment" class="timetable-filter-select" onchange="filterTimetableByDepartment()">
+                                <option value="">All Departments</option>
+                            </select>
                         </div>
-                        <p style="font-size: 0.7rem; color: #991B1B; line-height: 1.4;">
-                            <strong>CS410</strong> and <strong>EE402</strong> are both scheduled for <strong>Lab 1</strong> at 02:00 PM on Tuesday.
-                        </p>
-                        <button class="btn btn-primary btn-sm w-full" style="margin-top: 12px; background-color: #E11D48; border: none;">Auto-Resolve</button>
-                    </div>
-
-                    <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: var(--radius-md); padding: var(--spacing-3);">
-                        <div class="flex gap-2" style="margin-bottom: 8px; color: #166534;">
-                            <i class="fas fa-sparkles"></i>
-                            <span style="font-size: 0.75rem; font-weight: 800;">OPTIMAL SLOT FOUND</span>
-                        </div>
-                        <p style="font-size: 0.7rem; color: #166534; line-height: 1.4;">
-                            Moving CS410 to Friday 10:00 AM would reduce student transition time by 15%.
-                        </p>
-                        <div class="flex gap-2" style="margin-top: 12px;">
-                            <button class="btn btn-outline btn-sm flex-1">Dismiss</button>
-                            <button class="btn btn-primary btn-sm flex-1" style="background-color: #166534; border: none;">Apply</button>
+                        <div class="timetable-action-buttons">
+                            <button class="timetable-action-btn" onclick="exportTimetableToPDF()">
+                                <i class="fas fa-file-pdf"></i> PDF
+                            </button>
+                            <button class="timetable-action-btn" onclick="printTimetable()">
+                                <i class="fas fa-print"></i> Print
+                            </button>
+                            <button class="timetable-action-btn" onclick="showCreateTimetableModal()" style="background: var(--primary); color: white; border-color: var(--primary);">
+                                <i class="fas fa-plus"></i> Add Entry
+                            </button>
                         </div>
                     </div>
-                </div>
-
-                <div class="optimizer-card">
-                    <h4 style="font-size: 0.875rem; margin-bottom: var(--spacing-4);">SYSTEM HEALTH</h4>
-                    <div style="margin-bottom: var(--spacing-4);">
-                        <div class="flex justify-between" style="font-size: 0.75rem; font-weight: 600;">
-                            <span>Room Utilization</span>
-                            <span>84%</span>
+                    
+                    <!-- Timetable Grid and Reading Groups -->
+                    <div class="timetable-layout-flex">
+                        <div class="timetable-grid-wrapper" id="timetableExportable">
+                            ${gridHTML}
                         </div>
-                        <div class="health-bar"><div class="health-progress" style="width: 84%;"></div></div>
-                    </div>
-                    <div>
-                        <div class="flex justify-between" style="font-size: 0.75rem; font-weight: 600;">
-                            <span>Staff Load Balance</span>
-                            <span>92%</span>
+                        
+                        <div class="timetable-reading-group-panel">
+                            <div class="reading-group-header">
+                                <i class="fas fa-layer-group"></i>
+                                Reading Groups
+                            </div>
+                            ${readingGroupHTML}
                         </div>
-                        <div class="health-bar"><div class="health-progress" style="width: 92%; background-color: #10B981;"></div></div>
                     </div>
-                </div>
-
-                <div class="optimizer-card flex items-center justify-between" style="padding: var(--spacing-4);">
-                    <div>
-                        <h4 style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">SYSTEM STATUS</h4>
-                        <span style="font-size: 0.875rem; font-weight: 700; color: #10B981;">● Optimized</span>
+                    
+                    <!-- Legend -->
+                    <div class="timetable-legend">
+                        <div class="legend-title">Color Legend</div>
+                        <div class="legend-grid">
+                            <div class="legend-item">
+                                <div class="legend-color-box" style="background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); border-color: #3B82F6;"></div>
+                                <span class="legend-text">Laboratory Sessions</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color-box" style="background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); border-color: #10B981;"></div>
+                                <span class="legend-text">Lectures & Seminars</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color-box" style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border-color: #F59E0B;"></div>
+                                <span class="legend-text">Practical Classes</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color-box" style="background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%); border-color: #8B5CF6;"></div>
+                                <span class="legend-text">Special Sessions</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color-box" style="background: linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%); border-color: #EC4899;"></div>
+                                <span class="legend-text">Guest Lectures</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color-box" style="background: linear-gradient(135deg, #ECFDFD 0%, #CFFAFE 100%); border-color: #06B6D4;"></div>
+                                <span class="legend-text">Workshops</span>
+                            </div>
+                        </div>
                     </div>
-                    <i class="fas fa-check-circle" style="color: #10B981; font-size: 1.25rem;"></i>
-                </div>
-            </aside>
-        </div>
-
-        <!-- Summary Cards at Bottom -->
-        <div class="stats-grid" style="margin-top: var(--spacing-8);">
-            <div class="card stat-card">
-                <div class="stat-info">
-                    <p>TOTAL COURSES</p>
-                    <div class="flex items-center gap-2">
-                        <h3>124</h3>
-                        <span style="color: #10B981; font-size: 0.75rem; font-weight: 700;"><i class="fas fa-arrow-up"></i> 12</span>
-                    </div>
-                </div>
-            </div>
-            <div class="card stat-card">
-                <div class="stat-info">
-                    <p>ALLOCATED HOURS</p>
-                    <div class="flex items-center gap-2">
-                        <h3>842h</h3>
-                        <span style="color: var(--text-muted); font-size: 0.75rem;">of 1,000h cap</span>
-                    </div>
-                </div>
-            </div>
-            <div class="card stat-card">
-                <div class="stat-info">
-                    <p>PENDING LABS</p>
-                    <div class="flex items-center gap-2">
-                        <h3>08</h3>
-                        <span style="color: #F59E0B; font-size: 0.75rem; font-weight: 700;">Needs Action</span>
+                    
+                    <!-- Footer Info -->
+                    <div class="timetable-footer-info">
+                        <div class="timetable-info-item">
+                            <div class="timetable-info-icon"><i class="fas fa-book"></i></div>
+                            <span><strong>${entries.length}</strong> Total Classes</span>
+                        </div>
+                        <div class="timetable-info-item">
+                            <div class="timetable-info-icon"><i class="fas fa-users"></i></div>
+                            <span><strong>${uniqueLevels.length}</strong> Academic Levels</span>
+                        </div>
+                        <div class="timetable-info-item">
+                            <div class="timetable-info-icon"><i class="fas fa-clock"></i></div>
+                            <span><strong>${timeSlots.length}</strong> Time Slots</span>
+                        </div>
+                        <div class="timetable-info-item">
+                            <div class="timetable-info-icon"><i class="fas fa-door-open"></i></div>
+                            <span><strong>${[...new Set(entries.map(e => e.room_id))].length}</strong> Rooms in Use</span>
+                        </div>
                     </div>
                 </div>
             </div>
